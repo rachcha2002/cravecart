@@ -4,11 +4,10 @@
     "slug": "rider-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "scheme": "myapp",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#ffffff",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "updates": {
@@ -19,14 +18,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.riderapp"
+      "bundleIdentifier": "com.cravecart.riderapp"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      },
-      "package": "com.yourcompany.riderapp",
+      "package": "com.cravecart.riderapp",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -37,12 +32,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow the app to use your location."
-        }
-      ]
-    ]
+      "expo-router"
+    ],
+    "newArchEnabled": true
   }
 }
