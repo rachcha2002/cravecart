@@ -17,6 +17,9 @@ router.post(
 );
 router.post("/login", validator(validateLogin), authController.login);
 
+// Add refresh token route
+router.post("/refresh-token", authController.refreshToken);
+
 // Protected routes
 router.get("/me", auth, authController.getCurrentUser);
 router.post("/change-password", auth, authController.changePassword);

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from "react";
+import { Link, Outlet, useLocation } from "react-router-dom";
+import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../contexts/AuthContext";
+import { useCart } from "../contexts/CartContext";
+import { motion, AnimatePresence } from "framer-motion";
+import SessionTimer from "./SessionTimer";
 
 const Layout: React.FC = () => {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -13,28 +14,32 @@ const Layout: React.FC = () => {
   const location = useLocation();
 
   const navItems = [
-    { label: 'Home', path: '/' },
-    { label: 'About', path: '/about' },
-    { label: 'Contact', path: '/contact' },
+    { label: "Home", path: "/" },
+    { label: "About", path: "/about" },
+    { label: "Contact", path: "/contact" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+    <div
+      className={`min-h-screen ${
+        isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
+      }`}
+    >
       {/* Navigation */}
-      <nav className={`fixed w-full z-50 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+      <nav
+        className={`fixed w-full z-50 ${
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        } shadow-lg`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/" className="flex-shrink-0 flex items-center">
-                <img
-                  src="/logo.svg"
-                  alt="Foodie"
-                  className="h-8 w-auto"
-                />
+                <img src="/logo.svg" alt="Foodie" className="h-14 w-auto" />
               </Link>
-              
+
               {/* Desktop Navigation */}
               <div className="hidden md:ml-6 md:flex md:space-x-4">
                 {navItems.map((item) => (
@@ -44,11 +49,11 @@ const Layout: React.FC = () => {
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                       isActive(item.path)
                         ? isDarkMode
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-gray-100 text-gray-900'
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-900"
                         : isDarkMode
-                        ? 'text-gray-300 hover:bg-gray-700'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? "text-gray-300 hover:bg-gray-700"
+                        : "text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     {item.label}
@@ -63,10 +68,10 @@ const Layout: React.FC = () => {
               <button
                 onClick={toggleTheme}
                 className={`p-2 rounded-full ${
-                  isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
                 }`}
               >
-                {isDarkMode ? '🌞' : '🌙'}
+                {isDarkMode ? "🌞" : "🌙"}
               </button>
 
               {/* Cart */}
@@ -89,7 +94,7 @@ const Layout: React.FC = () => {
                     <Link
                       to="/profile"
                       className={`px-4 py-2 rounded-md text-sm font-medium ${
-                        isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                        isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
                       }`}
                     >
                       Profile
@@ -98,8 +103,8 @@ const Layout: React.FC = () => {
                       onClick={logout}
                       className={`ml-2 px-4 py-2 rounded-md text-sm font-medium ${
                         isDarkMode
-                          ? 'bg-red-600 hover:bg-red-700'
-                          : 'bg-red-500 hover:bg-red-600'
+                          ? "bg-red-600 hover:bg-red-700"
+                          : "bg-red-500 hover:bg-red-600"
                       } text-white`}
                     >
                       Logout
@@ -110,7 +115,7 @@ const Layout: React.FC = () => {
                     <Link
                       to="/login"
                       className={`px-4 py-2 rounded-md text-sm font-medium ${
-                        isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                        isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
                       }`}
                     >
                       Login
@@ -119,8 +124,8 @@ const Layout: React.FC = () => {
                       to="/register"
                       className={`ml-2 px-4 py-2 rounded-md text-sm font-medium ${
                         isDarkMode
-                          ? 'bg-[#f29f05] hover:bg-[#e69504]'
-                          : 'bg-[#f29f05] hover:bg-[#e69504]'
+                          ? "bg-[#f29f05] hover:bg-[#e69504]"
+                          : "bg-[#f29f05] hover:bg-[#e69504]"
                       } text-white`}
                     >
                       Register
@@ -134,7 +139,7 @@ const Layout: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="md:hidden ml-4 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                {isMobileMenuOpen ? '✕' : '☰'}
+                {isMobileMenuOpen ? "✕" : "☰"}
               </button>
             </div>
           </div>
@@ -145,11 +150,15 @@ const Layout: React.FC = () => {
           {isMobileMenuOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
+              animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden"
             >
-              <div className={`px-2 pt-2 pb-3 space-y-1 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div
+                className={`px-2 pt-2 pb-3 space-y-1 ${
+                  isDarkMode ? "bg-gray-800" : "bg-white"
+                }`}
+              >
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
@@ -157,11 +166,11 @@ const Layout: React.FC = () => {
                     className={`block px-3 py-2 rounded-md text-base font-medium ${
                       isActive(item.path)
                         ? isDarkMode
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-gray-100 text-gray-900'
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-900"
                         : isDarkMode
-                        ? 'text-gray-300 hover:bg-gray-700'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? "text-gray-300 hover:bg-gray-700"
+                        : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -216,8 +225,13 @@ const Layout: React.FC = () => {
         <Outlet />
       </main>
 
+      {/* Add the session timer */}
+      <SessionTimer />
+
       {/* Footer */}
-      <footer className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} mt-auto`}>
+      <footer
+        className={`${isDarkMode ? "bg-gray-800" : "bg-gray-100"} mt-auto`}
+      >
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
@@ -230,23 +244,57 @@ const Layout: React.FC = () => {
               <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link to="/about" className="hover:underline">About</Link>
+                  <Link to="/about" className="hover:underline">
+                    About
+                  </Link>
                 </li>
                 <li>
-                  <Link to="/contact" className="hover:underline">Contact</Link>
+                  <Link to="/contact" className="hover:underline">
+                    Contact
+                  </Link>
                 </li>
                 <li>
-                  <Link to="/terms" className="hover:underline">Terms & Conditions</Link>
+                  <Link to="/terms" className="hover:underline">
+                    Terms & Conditions
+                  </Link>
                 </li>
               </ul>
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-4">Connect With Us</h3>
               <div className="flex space-x-4">
-                <a href="https://apps.apple.com/foodie" target="_blank" rel="noopener noreferrer" className="hover:opacity-80">📱</a>
-                <a href="https://facebook.com/foodie" target="_blank" rel="noopener noreferrer" className="hover:opacity-80">📘</a>
-                <a href="https://instagram.com/foodie" target="_blank" rel="noopener noreferrer" className="hover:opacity-80">📸</a>
-                <a href="https://twitter.com/foodie" target="_blank" rel="noopener noreferrer" className="hover:opacity-80">🐦</a>
+                <a
+                  href="https://apps.apple.com/foodie"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:opacity-80"
+                >
+                  📱
+                </a>
+                <a
+                  href="https://facebook.com/foodie"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:opacity-80"
+                >
+                  📘
+                </a>
+                <a
+                  href="https://instagram.com/foodie"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:opacity-80"
+                >
+                  📸
+                </a>
+                <a
+                  href="https://twitter.com/foodie"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:opacity-80"
+                >
+                  🐦
+                </a>
               </div>
             </div>
           </div>
@@ -261,4 +309,4 @@ const Layout: React.FC = () => {
   );
 };
 
-export default Layout; 
+export default Layout;
