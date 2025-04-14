@@ -1,13 +1,21 @@
 {
   "name": "user-service",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "User management service for CraveCart food delivery platform",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --detectOpenHandles",
+    "test:watch": "jest --watchAll"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "microservices",
+    "user-service",
+    "authentication",
+    "food-delivery"
+  ],
+  "author": "CraveCart Team-Rachith(Dev)",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^5.1.1",
