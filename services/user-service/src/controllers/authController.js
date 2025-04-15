@@ -156,10 +156,56 @@ const logout = async (req, res) => {
   }
 };
 
+/**
+ * Refresh JWT token
+ * @route POST /api/auth/refresh-token
+ * @access Public (with valid refresh token)
+ */
+const refreshToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    // Verify the existing token
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      ignoreExpiration: true,
+    });
+
+    // Check if user still exists and is active
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.status !== "active") {
+      return res.status(403).json({ message: "Account is not active" });
+    }
+
+    // Generate a new token
+    const newToken = jwt.sign(
+      { id: user._id, role: user.role },
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiration }
+    );
+
+    res.json({
+      message: "Token refreshed successfully",
+      token: newToken,
+    });
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    res.status(401).json({ message: "Invalid token" });
+  }
+};
+
 module.exports = {
   register,
   login,
   getCurrentUser,
   changePassword,
   logout,
+  refreshToken,
 };
