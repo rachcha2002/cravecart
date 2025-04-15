@@ -17,6 +17,16 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "Email already in use" });
     }
 
+    // Ensure business hours are properly structured
+    if (req.body.role === "restaurant" && req.body.restaurantInfo) {
+      if (!req.body.restaurantInfo.businessHours) {
+        req.body.restaurantInfo.businessHours = {
+          open: "",
+          close: "",
+        };
+      }
+    }
+
     // Create new user
     const user = new User(req.body);
 

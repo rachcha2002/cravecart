@@ -1,7 +1,29 @@
 import React, { useState } from "react";
-import { Outlet, Link } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Outlet,
+  Navigate,
+  Link,
+} from "react-router-dom";
+import { useAuth } from "./contexts/AuthContext";
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import Dashboard from "./pages/Dashboard";
+import Menu from "./pages/Menu";
+import Orders from "./pages/Orders";
+import Profile from "./pages/Profile";
 
+// Protected Route Wrapper
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+// Layout component for authenticated routes
 const Layout: React.FC = () => {
   const { logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -178,4 +200,49 @@ const Layout: React.FC = () => {
   );
 };
 
-export default Layout;
+export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <LandingPage />,
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
+  },
+  {
+    path: "/",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        path: "dashboard",
+        element: <Dashboard />,
+      },
+      {
+        path: "menu",
+        element: <Menu />,
+      },
+      {
+        path: "orders",
+        element: <Orders />,
+      },
+      {
+        path: "profile",
+        element: <Profile />,
+      },
+    ],
+  },
+]);
+
+const App: React.FC = () => {
+  return <RouterProvider router={router} />;
+};
+
+export default App;

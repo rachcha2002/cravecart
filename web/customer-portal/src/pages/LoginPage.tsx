@@ -1,51 +1,33 @@
-import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useAuth } from '../hooks/useAuth';
-import toast from 'react-hot-toast';
+import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
-    try {
-      const success = await login(formData.email, formData.password);
-      if (success) {
-        toast.success('Successfully logged in!');
-        const from = (location.state as any)?.from?.pathname || '/';
-        navigate(from, { replace: true });
-      } else {
-        toast.error('Invalid email or password');
-      }
-    } catch (error) {
-      toast.error('An error occurred during login');
-    } finally {
-      setIsLoading(false);
+    const success = await login(formData.email, formData.password);
+    if (success) {
+      const from = (location.state as any)?.from?.pathname || "/";
+      navigate(from, { replace: true });
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md"
-    >
+    <div className="max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
       <h2 className="text-3xl font-bold text-center mb-6 text-gray-900 dark:text-white">
         Welcome Back
       </h2>
@@ -96,16 +78,16 @@ const LoginPage = () => {
           type="submit"
           disabled={isLoading}
           className={`w-full py-3 px-4 rounded-lg bg-primary text-white font-medium transition-colors ${
-            isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary/90'
+            isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-primary/90"
           }`}
         >
-          {isLoading ? 'Signing in...' : 'Sign In'}
+          {isLoading ? "Signing in..." : "Sign In"}
         </button>
       </form>
 
       <div className="mt-6 text-center">
         <p className="text-gray-600 dark:text-gray-300">
-          Don't have an account?{' '}
+          Don't have an account?{" "}
           <Link
             to="/register"
             className="text-primary hover:text-primary/90 font-medium"
@@ -114,8 +96,8 @@ const LoginPage = () => {
           </Link>
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
-export default LoginPage; 
+export default LoginPage;
