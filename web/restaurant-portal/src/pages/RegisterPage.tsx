@@ -15,6 +15,7 @@ const RegisterPage: React.FC = () => {
     restaurantInfo: {
       restaurantName: "",
       cuisine: [],
+      description: "",
       businessHours: {
         open: "",
         close: "",
@@ -23,7 +24,9 @@ const RegisterPage: React.FC = () => {
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value } = e.target;
     if (name.startsWith("restaurantInfo.")) {
@@ -226,6 +229,24 @@ const RegisterPage: React.FC = () => {
                   <option value="japanese">Japanese</option>
                   <option value="mediterranean">Mediterranean</option>
                 </select>
+              </div>
+
+              <div className="col-span-2">
+                <label
+                  htmlFor="restaurantInfo.description"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Restaurant Description
+                </label>
+                <textarea
+                  name="restaurantInfo.description"
+                  id="restaurantInfo.description"
+                  rows={3}
+                  value={formData.restaurantInfo.description || ""}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  placeholder="Describe your restaurant, cuisine, and specialties..."
+                />
               </div>
 
               <div>

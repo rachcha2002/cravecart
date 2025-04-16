@@ -30,6 +30,7 @@ export interface RegisterData {
   restaurantInfo: {
     restaurantName: string;
     cuisine: string[];
+    description: string;
     businessHours: {
       open: string;
       close: string;
