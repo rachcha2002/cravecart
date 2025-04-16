@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { RegisterData } from "../services/userService";
 
 const RegisterPage: React.FC = () => {
-  const { register, error, clearError } = useAuth();
+  const navigate = useNavigate();
+  const { register, error, clearError, loading } = useAuth();
   const [formData, setFormData] = useState<RegisterData>({
     name: "",
     email: "",
@@ -66,6 +67,7 @@ const RegisterPage: React.FC = () => {
     e.preventDefault();
     try {
       await register(formData);
+      navigate("/dashboard");
     } catch (error) {
       console.error("Registration failed:", error);
     }
@@ -277,9 +279,10 @@ const RegisterPage: React.FC = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Register Restaurant
+                {loading ? "Registering..." : "Register Restaurant"}
               </button>
             </div>
           </form>
