@@ -26,6 +26,44 @@ router.put(
 
 // Restaurant routes
 router.get("/restaurants/nearby", auth, userController.getNearbyRestaurants);
+router.post(
+  "/restaurant/images",
+  auth,
+  checkRole(["restaurant"]),
+  userController.addRestaurantImage
+);
+router.delete(
+  "/restaurant/images/:imageId",
+  auth,
+  checkRole(["restaurant"]),
+  userController.removeRestaurantImage
+);
+router.patch(
+  "/restaurant/description",
+  auth,
+  checkRole(["restaurant"]),
+  userController.updateRestaurantDescription
+);
+
+// Customer routes
+router.post(
+  "/customer/locations",
+  auth,
+  checkRole(["customer"]),
+  userController.addDefaultLocation
+);
+router.put(
+  "/customer/locations/:locationId",
+  auth,
+  checkRole(["customer"]),
+  userController.updateDefaultLocation
+);
+router.delete(
+  "/customer/locations/:locationId",
+  auth,
+  checkRole(["customer"]),
+  userController.removeDefaultLocation
+);
 
 // Delivery personnel routes
 router.patch(
