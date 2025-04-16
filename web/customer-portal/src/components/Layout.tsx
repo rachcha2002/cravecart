@@ -73,7 +73,6 @@ const Layout: React.FC = () => {
               >
                 {isDarkMode ? "🌞" : "🌙"}
               </button>
-
               {/* Cart */}
               <Link
                 to="/cart"

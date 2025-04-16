@@ -82,6 +82,17 @@ const validateRegistration = (data) => {
         message: "Restaurant name is required",
       });
     }
+
+    if (
+      !data.restaurantInfo.businessHours ||
+      !data.restaurantInfo.businessHours.open ||
+      !data.restaurantInfo.businessHours.close
+    ) {
+      errors.push({
+        path: ["restaurantInfo.businessHours"],
+        message: "Business hours (open and close) are required",
+      });
+    }
   }
 
   // Delivery personnel specific validation

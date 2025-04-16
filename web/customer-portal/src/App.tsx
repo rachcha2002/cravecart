@@ -1,8 +1,8 @@
-import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
-import { RootProvider } from './contexts/RootProvider';
-import { Toaster } from 'react-hot-toast';
-import Routes from './Routes';
+import React from "react";
+import { BrowserRouter as Router } from "react-router-dom";
+import { RootProvider } from "./contexts/RootProvider";
+import { Toaster } from "react-hot-toast";
+import Routes from "./Routes";
 
 const App: React.FC = () => {
   return (

@@ -28,6 +28,7 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<boolean>;
   refreshToken: () => Promise<boolean>;
+  sessionTimeRemaining: number | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -41,6 +42,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionTimeRemaining, setSessionTimeRemaining] = useState<
+    number | null
+  >(null);
+
+  // Load user data if token exists
+  useEffect(() => {
+    const loadUser = async () => {
+      if (token && !user) {
+        try {
+          const response = await axios.get(`${API_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          setUser(response.data.user);
+        } catch (error) {
+          localStorage.removeItem("token");
+          setToken(null);
+        }
+      }
+    };
+
+    loadUser();
+  }, [token, user]);
+
+  // Token expiration check for session timer
+  useEffect(() => {
+    if (!token) {
+      setSessionTimeRemaining(null);
+      return;
+    }
+
+    const checkTokenExpiration = () => {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const expiryTime = payload.exp * 1000;
+        const remaining = Math.floor((expiryTime - Date.now()) / 1000);
+        setSessionTimeRemaining(remaining > 0 ? remaining : 0);
+      } catch (error) {
+        setSessionTimeRemaining(null);
+      }
+    };
+
+    checkTokenExpiration();
+    const timer = setInterval(checkTokenExpiration, 1000);
+
+    return () => clearInterval(timer);
+  }, [token]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
@@ -51,10 +100,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         password,
       });
-      const { token, user } = response.data;
-      setUser(user);
-      setToken(token);
-      localStorage.setItem("token", token);
+      const { token: newToken, user: userData } = response.data;
+      setUser(userData);
+      setToken(newToken);
+      localStorage.setItem("token", newToken);
+      toast.success("Login successful!");
       return true;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "Login failed";
@@ -81,13 +131,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         password,
         phoneNumber,
-        role: "customer", // Always set role to customer for the customer portal
+        role: "customer",
       });
 
-      const { token, user } = response.data;
-      setUser(user);
-      setToken(token);
-      localStorage.setItem("token", token);
+      const { token: newToken, user: userData } = response.data;
+      setUser(userData);
+      setToken(newToken);
+      localStorage.setItem("token", newToken);
+      toast.success("Registration successful!");
       return true;
     } catch (error: any) {
       const errorMessage =
@@ -104,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUser(null);
     setToken(null);
     localStorage.removeItem("token");
+    window.dispatchEvent(new Event("user-logout"));
   };
 
   const updateProfile = async (userData: Partial<User>): Promise<boolean> => {
@@ -119,6 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       );
       setUser(response.data.user);
+      toast.success("Profile updated successfully");
       return true;
     } catch (error: any) {
       const errorMessage =
@@ -131,73 +184,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Add a function to check token expiration
-  const isTokenExpired = (token: string): boolean => {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.exp * 1000 < Date.now();
-    } catch (error) {
-      return true;
-    }
-  };
-
-  // Add session check on component mount
-  useEffect(() => {
-    const checkSession = async () => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        if (isTokenExpired(token)) {
-          // Token is expired, log the user out
-          logout();
-          toast.error("Your session has expired. Please log in again.");
-        } else {
-          // Token is valid, fetch user data
-          try {
-            const response = await axios.get("/api/auth/me", {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            setUser(response.data.user);
-            setToken(token);
-          } catch (error) {
-            logout();
-          }
-        }
-      }
-      setIsLoading(false);
-    };
-
-    checkSession();
-  }, []);
-
-  // Add token refresh functionality
   const refreshToken = async (): Promise<boolean> => {
     try {
-      const response = await axios.post("/api/auth/refresh-token", {
-        token: token,
+      const response = await axios.post(`${API_URL}/auth/refresh-token`, {
+        token,
       });
 
       const { token: newToken } = response.data;
       setToken(newToken);
       localStorage.setItem("token", newToken);
+      toast.success("Session refreshed", { id: "session-refresh" });
       return true;
     } catch (error) {
       logout();
+      toast.error("Session expired. Please login again.");
       return false;
     }
   };
-
-  // Add axios interceptor to include token in all requests
-  axios.interceptors.request.use(
-    (config) => {
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
-    }
-  );
 
   return (
     <AuthContext.Provider
@@ -206,12 +209,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         token,
         isLoading,
         error,
-        isAuthenticated: !!token,
+        isAuthenticated: !!token && !!user,
         login,
         register,
         logout,
         updateProfile,
         refreshToken,
+        sessionTimeRemaining,
       }}
     >
       {children}
