@@ -357,6 +357,276 @@ const getAvailableDeliveryPersonnel = async (req, res) => {
   }
 };
 
+/**
+ * Add restaurant image
+ * @route POST /api/users/restaurant/images
+ * @access Private/Restaurant
+ */
+const addRestaurantImage = async (req, res) => {
+  try {
+    const { url, description, isPrimary } = req.body;
+    const userId = req.user._id;
+
+    if (!url) {
+      return res.status(400).json({ message: "Image URL is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "restaurant") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (isPrimary) {
+      if (user.restaurantInfo.images) {
+        user.restaurantInfo.images.forEach((image) => {
+          image.isPrimary = false;
+        });
+      } else {
+        user.restaurantInfo.images = [];
+      }
+    }
+
+    user.restaurantInfo.images.push({
+      url,
+      description,
+      isPrimary: isPrimary || false,
+      uploadedAt: Date.now(),
+    });
+
+    await user.save();
+
+    res.json({
+      message: "Image added successfully",
+      images: user.restaurantInfo.images,
+    });
+  } catch (error) {
+    console.error("Add restaurant image error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Remove restaurant image
+ * @route DELETE /api/users/restaurant/images/:imageId
+ * @access Private/Restaurant
+ */
+const removeRestaurantImage = async (req, res) => {
+  try {
+    const { imageId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "restaurant") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (!user.restaurantInfo.images) {
+      return res.status(404).json({ message: "No images found" });
+    }
+
+    user.restaurantInfo.images = user.restaurantInfo.images.filter(
+      (image) => image._id.toString() !== imageId
+    );
+
+    await user.save();
+
+    res.json({
+      message: "Image removed successfully",
+      images: user.restaurantInfo.images,
+    });
+  } catch (error) {
+    console.error("Remove restaurant image error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Update restaurant description
+ * @route PATCH /api/users/restaurant/description
+ * @access Private/Restaurant
+ */
+const updateRestaurantDescription = async (req, res) => {
+  try {
+    const { description } = req.body;
+    const userId = req.user._id;
+
+    if (!description) {
+      return res.status(400).json({ message: "Description is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "restaurant") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (!user.restaurantInfo) {
+      user.restaurantInfo = {};
+    }
+
+    user.restaurantInfo.description = description;
+    await user.save();
+
+    res.json({
+      message: "Restaurant description updated successfully",
+      description: user.restaurantInfo.description,
+    });
+  } catch (error) {
+    console.error("Update restaurant description error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Add customer default location
+ * @route POST /api/users/customer/locations
+ * @access Private/Customer
+ */
+const addDefaultLocation = async (req, res) => {
+  try {
+    const { name, address, coordinates, isDefault } = req.body;
+    const userId = req.user._id;
+
+    if (!name || !address || !coordinates) {
+      return res
+        .status(400)
+        .json({ message: "Name, address, and coordinates are required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "customer") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (!user.defaultLocations) {
+      user.defaultLocations = [];
+    }
+
+    if (isDefault) {
+      user.defaultLocations.forEach((location) => {
+        location.isDefault = false;
+      });
+    }
+
+    user.defaultLocations.push({
+      name,
+      address,
+      location: {
+        type: "Point",
+        coordinates,
+      },
+      isDefault: isDefault || false,
+      createdAt: Date.now(),
+    });
+
+    await user.save();
+
+    res.json({
+      message: "Default location added successfully",
+      locations: user.defaultLocations,
+    });
+  } catch (error) {
+    console.error("Add default location error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Update customer default location
+ * @route PUT /api/users/customer/locations/:locationId
+ * @access Private/Customer
+ */
+const updateDefaultLocation = async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const { name, address, coordinates, isDefault } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "customer") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (!user.defaultLocations || user.defaultLocations.length === 0) {
+      return res.status(404).json({ message: "No locations found" });
+    }
+
+    const locationIndex = user.defaultLocations.findIndex(
+      (loc) => loc._id.toString() === locationId
+    );
+
+    if (locationIndex === -1) {
+      return res.status(404).json({ message: "Location not found" });
+    }
+
+    if (isDefault) {
+      user.defaultLocations.forEach((location) => {
+        location.isDefault = false;
+      });
+    }
+
+    user.defaultLocations[locationIndex] = {
+      ...user.defaultLocations[locationIndex],
+      name: name || user.defaultLocations[locationIndex].name,
+      address: address || user.defaultLocations[locationIndex].address,
+      location: coordinates
+        ? {
+            type: "Point",
+            coordinates,
+          }
+        : user.defaultLocations[locationIndex].location,
+      isDefault:
+        isDefault !== undefined
+          ? isDefault
+          : user.defaultLocations[locationIndex].isDefault,
+    };
+
+    await user.save();
+
+    res.json({
+      message: "Default location updated successfully",
+      locations: user.defaultLocations,
+    });
+  } catch (error) {
+    console.error("Update default location error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Remove customer default location
+ * @route DELETE /api/users/customer/locations/:locationId
+ * @access Private/Customer
+ */
+const removeDefaultLocation = async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user || user.role !== "customer") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (!user.defaultLocations || user.defaultLocations.length === 0) {
+      return res.status(404).json({ message: "No locations found" });
+    }
+
+    user.defaultLocations = user.defaultLocations.filter(
+      (location) => location._id.toString() !== locationId
+    );
+
+    await user.save();
+
+    res.json({
+      message: "Default location removed successfully",
+      locations: user.defaultLocations,
+    });
+  } catch (error) {
+    console.error("Remove default location error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -368,4 +638,10 @@ module.exports = {
   updateDeliveryLocation,
   updateDeliveryAvailability,
   getAvailableDeliveryPersonnel,
+  addRestaurantImage,
+  removeRestaurantImage,
+  updateRestaurantDescription,
+  addDefaultLocation,
+  updateDefaultLocation,
+  removeDefaultLocation,
 };

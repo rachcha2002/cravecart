@@ -42,6 +42,8 @@ export class UserService {
   private baseUrl =
     process.env.REACT_APP_API_URL || "http://localhost:3001/api";
   private axiosInstance;
+  private isRefreshing = false;
+  private refreshSubscribers: Array<(token: string) => void> = [];
 
   private constructor() {
     this.axiosInstance = axios.create({
@@ -59,6 +61,17 @@ export class UserService {
       UserService.instance = new UserService();
     }
     return UserService.instance;
+  }
+
+  // Add new subscriber to token refresh
+  private onTokenRefreshed(callback: (token: string) => void) {
+    this.refreshSubscribers.push(callback);
+  }
+
+  // Notify all subscribers that the token has been refreshed
+  private notifySubscribersAboutTokenRefresh(token: string) {
+    this.refreshSubscribers.forEach((callback) => callback(token));
+    this.refreshSubscribers = [];
   }
 
   private setupInterceptors() {
@@ -82,24 +95,45 @@ export class UserService {
       async (error) => {
         const originalRequest = error.config;
 
-        // If the error is 401 and we haven't tried to refresh the token yet
+        // Handle 401 errors for token refresh
         if (error.response?.status === 401 && !originalRequest._retry) {
+          if (this.isRefreshing) {
+            // If already refreshing, wait and retry with new token
+            return new Promise((resolve) => {
+              this.onTokenRefreshed((token) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(this.axiosInstance(originalRequest));
+              });
+            });
+          }
+
           originalRequest._retry = true;
+          this.isRefreshing = true;
 
           try {
             const token = localStorage.getItem("token");
-            if (!token) throw new Error("No token found");
+            if (!token) {
+              throw new Error("No token found");
+            }
 
             const response = await this.refreshToken(token);
-            localStorage.setItem("token", response.token);
+            const newToken = response.token;
+            localStorage.setItem("token", newToken);
 
-            // Retry the original request with the new token
-            originalRequest.headers.Authorization = `Bearer ${response.token}`;
+            // Update the authorization header
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+            // Notify all pending requests that token has been refreshed
+            this.notifySubscribersAboutTokenRefresh(newToken);
+
+            this.isRefreshing = false;
             return this.axiosInstance(originalRequest);
           } catch (refreshError) {
-            // If refresh token fails, clear the token and redirect to login
+            this.isRefreshing = false;
             localStorage.removeItem("token");
-            window.location.href = "/login";
+
+            // Don't automatically redirect - just reject the promise
+            // The auth context will handle the redirection
             return Promise.reject(refreshError);
           }
         }
@@ -134,11 +168,23 @@ export class UserService {
   }
 
   async refreshToken(token: string): Promise<{ token: string }> {
-    const response = await this.axiosInstance.post<{ token: string }>(
-      "/auth/refresh-token",
-      { token }
-    );
-    return response.data;
+    try {
+      const response = await this.axiosInstance.post<{ token: string }>(
+        "/auth/refresh-token",
+        { token }
+      );
+      return response.data;
+    } catch (error) {
+      // If the refresh token endpoint fails, try a silent fallback to getCurrentUser
+      // This can help with backends that don't have a dedicated refresh endpoint
+      try {
+        await this.getCurrentUser();
+        // If the getCurrentUser succeeds with the current token, it's still valid
+        return { token };
+      } catch {
+        throw error;
+      }
+    }
   }
 }
 

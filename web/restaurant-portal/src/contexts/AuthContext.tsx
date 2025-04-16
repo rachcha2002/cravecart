@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { User, LoginResponse, RegisterData } from "../services/userService";
 import { userService } from "../services/userService";
 
@@ -35,77 +41,129 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState<
     number | null
   >(null);
+  const [tokenCheckInterval, setTokenCheckInterval] =
+    useState<NodeJS.Timeout | null>(null);
 
-  // Load user data if token exists
-  useEffect(() => {
-    const loadUser = async () => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const currentUser = await userService.getCurrentUser();
-          setUser(currentUser);
-          setIsAuthenticated(true);
-        } catch (error) {
-          console.error("Failed to load user:", error);
-          localStorage.removeItem("token");
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      }
-      setLoading(false);
-    };
-
-    loadUser();
-  }, []); // Remove user dependency to prevent unnecessary re-renders
-
-  // Token expiration check for session timer
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setSessionTimeRemaining(null);
-      return;
-    }
-
-    const checkTokenExpiration = () => {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const expiryTime = payload.exp * 1000;
-        const remaining = Math.floor((expiryTime - Date.now()) / 1000);
-        setSessionTimeRemaining(remaining > 0 ? remaining : 0);
-
-        // Auto-refresh token if it's about to expire (within 5 minutes)
-        if (remaining < 300 && remaining > 60) {
-          refreshToken();
-        }
-      } catch (error) {
-        console.error("Token validation error:", error);
-        setSessionTimeRemaining(null);
-        logout();
-      }
-    };
-
-    checkTokenExpiration();
-    const timer = setInterval(checkTokenExpiration, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const refreshToken = async () => {
+  // Refreshes the authentication token
+  const refreshToken = useCallback(async (): Promise<void> => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
 
       const response = await userService.refreshToken(token);
-      localStorage.setItem("token", response.token);
-      // After refreshing token, reload user data
+      if (response && response.token) {
+        localStorage.setItem("token", response.token);
+      }
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+    }
+  }, []);
+
+  // Validates the current token and checks its expiration
+  const validateToken = useCallback(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSessionTimeRemaining(null);
+      setIsAuthenticated(false);
+      setUser(null);
+      return false;
+    }
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const expiryTime = payload.exp * 1000;
+      const remaining = Math.floor((expiryTime - Date.now()) / 1000);
+
+      // Token is expired
+      if (remaining <= 0) {
+        setSessionTimeRemaining(0);
+        setIsAuthenticated(false);
+        return false;
+      }
+
+      // Token is valid
+      setSessionTimeRemaining(remaining);
+
+      // If token is about to expire (within 5 minutes), try to refresh it
+      if (remaining < 300) {
+        refreshToken().catch((err) => {
+          console.error("Error while refreshing token:", err);
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Token validation error:", error);
+      setSessionTimeRemaining(null);
+      setIsAuthenticated(false);
+      return false;
+    }
+  }, [refreshToken]);
+
+  // Load user data on initial mount and when token changes
+  const loadUser = useCallback(async () => {
+    setLoading(true);
+
+    const isTokenValid = validateToken();
+    if (!isTokenValid) {
+      setLoading(false);
+      return;
+    }
+
+    try {
       const currentUser = await userService.getCurrentUser();
       setUser(currentUser);
       setIsAuthenticated(true);
     } catch (error) {
-      console.error("Token refresh failed:", error);
-      logout();
+      console.error("Failed to load user:", error);
+      localStorage.removeItem("token");
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [validateToken]);
+
+  // Setup token validation and user loading on mount
+  useEffect(() => {
+    loadUser();
+
+    // Set up periodic token validation
+    const interval = setInterval(() => {
+      validateToken();
+    }, 60000); // Check every minute
+
+    setTokenCheckInterval(interval);
+
+    return () => {
+      if (tokenCheckInterval) {
+        clearInterval(tokenCheckInterval);
+      }
+    };
+  }, [loadUser, validateToken]);
+
+  // Listen for storage events (if user logs out in another tab)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "token") {
+        if (!e.newValue) {
+          // Token was removed in another tab
+          setUser(null);
+          setIsAuthenticated(false);
+          setSessionTimeRemaining(null);
+        } else if (e.newValue !== e.oldValue) {
+          // Token was changed in another tab
+          loadUser();
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [loadUser]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -115,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("token", response.token);
       setUser(response.user);
       setIsAuthenticated(true);
+      validateToken(); // Initialize session time
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "Login failed";
       setError(errorMessage);
@@ -132,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem("token", response.token);
       setUser(response.user);
       setIsAuthenticated(true);
+      validateToken(); // Initialize session time
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Registration failed";
