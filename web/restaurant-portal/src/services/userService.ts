@@ -35,6 +35,7 @@ export interface RegisterData {
       open: string;
       close: string;
     };
+    images: { url: string; description: string }[];
   };
 }
 

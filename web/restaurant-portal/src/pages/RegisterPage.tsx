@@ -2,6 +2,13 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { RegisterData } from "../services/userService";
+import ImageUploader from "../components/ImageUploader";
+
+interface ImageInfo {
+  url: string;
+  description: string;
+  isPrimary?: boolean;
+}
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +27,7 @@ const RegisterPage: React.FC = () => {
         open: "",
         close: "",
       },
+      images: [] as ImageInfo[],
     },
   });
 
@@ -74,6 +82,24 @@ const RegisterPage: React.FC = () => {
     } catch (error) {
       console.error("Registration failed:", error);
     }
+  };
+
+  // Handle image upload success
+  const handleImageUpload = (url: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      restaurantInfo: {
+        ...prev.restaurantInfo,
+        images: [
+          ...(prev.restaurantInfo.images || []),
+          {
+            url,
+            description: "",
+            isPrimary: prev.restaurantInfo.images?.length === 0,
+          },
+        ],
+      },
+    }));
   };
 
   return (
@@ -284,6 +310,66 @@ const RegisterPage: React.FC = () => {
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
                 />
               </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Restaurant Images
+              </label>
+              <div className="mt-1 flex items-center">
+                <ImageUploader onUploadSuccess={handleImageUpload} />
+              </div>
+
+              {/* Display uploaded images */}
+              {formData.restaurantInfo.images &&
+                formData.restaurantInfo.images.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {formData.restaurantInfo.images.map((image, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={image.url}
+                          alt={`Restaurant ${index + 1}`}
+                          className="h-24 w-full object-cover rounded-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              restaurantInfo: {
+                                ...prev.restaurantInfo,
+                                images: prev.restaurantInfo.images?.filter(
+                                  (_, i) => i !== index
+                                ),
+                              },
+                            }));
+                          }}
+                          className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full p-1"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                        {image.isPrimary && (
+                          <div className="absolute bottom-0 left-0 bg-green-500 text-white text-xs p-1 rounded-tr-md">
+                            Primary
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
 
             <div className="flex items-center justify-between">
