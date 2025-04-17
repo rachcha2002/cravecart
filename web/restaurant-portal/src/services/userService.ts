@@ -27,14 +27,27 @@ export interface RegisterData {
   password: string;
   phoneNumber: string;
   role: string;
+  address: string;
   restaurantInfo: {
     restaurantName: string;
     cuisine: string[];
+    description: string;
     businessHours: {
       open: string;
       close: string;
     };
+    images: ImageInfo[];
+    location: {
+      type: "Point";
+      coordinates: [number, number];
+    };
   };
+}
+
+export interface ImageInfo {
+  url: string;
+  description: string;
+  isPrimary?: boolean;
 }
 
 export class UserService {
