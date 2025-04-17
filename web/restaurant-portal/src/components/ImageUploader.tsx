@@ -1,5 +1,5 @@
 // src/components/ImageUploader.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useState } from "react";
 
 interface ImageUploaderProps {
   onUploadSuccess: (url: string) => void;
@@ -10,71 +10,102 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   onUploadSuccess,
   buttonText = "Upload Image",
 }) => {
-  const cloudinaryWidget = useRef<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  useEffect(() => {
-    // @ts-ignore - Cloudinary is loaded from CDN
-    if (window.cloudinary) {
-      cloudinaryWidget.current = window.cloudinary.createUploadWidget(
+  // Hardcode the values for now - this will make debugging easier
+  // These should match exactly what you see in your Cloudinary dashboard
+  const cloudName = "dn1w8k2l1"; // Your cloud name
+  const uploadPreset = "restaurant_images"; // Your upload preset name
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+
+    // Basic validation
+    if (!file.type.match(/image\/(jpeg|png|jpg|webp)/)) {
+      setError("Please select a valid image file (JPEG, PNG, WebP)");
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    setUploadProgress(0);
+
+    // Create form data for upload
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
+    try {
+      console.log(
+        `Uploading to: https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
+      );
+
+      // Use fetch for simplicity during debugging
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         {
-          cloudName: "dn1w8k2l1", // Replace with your Cloudinary cloud name
-          uploadPreset: "restaurant-images", // Replace with your upload preset
-          sources: ["local", "camera"],
-          multiple: false,
-          cropping: true,
-          styles: {
-            palette: {
-              window: "#F5F5F5",
-              sourceBg: "#FFFFFF",
-              windowBorder: "#90a0b3",
-              tabIcon: "#0094c7",
-              inactiveTabIcon: "#69778A",
-              menuIcons: "#0094C7",
-              link: "#53ad9d",
-              action: "#8F5DA5",
-              inProgress: "#0194c7",
-              complete: "#53ad9d",
-              error: "#c43737",
-              textDark: "#000000",
-              textLight: "#FFFFFF",
-            },
-          },
-        },
-        (error: any, result: any) => {
-          if (!error && result && result.event === "success") {
-            onUploadSuccess(result.info.secure_url);
-          }
+          method: "POST",
+          body: formData,
         }
       );
-    }
-  }, [onUploadSuccess]);
 
-  const openWidget = () => {
-    if (cloudinaryWidget.current) {
-      cloudinaryWidget.current.open();
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Upload error response:", data);
+        setError(data.error ? data.error.message : "Upload failed");
+        setUploading(false);
+        return;
+      }
+
+      console.log("Upload success:", data);
+      onUploadSuccess(data.secure_url);
+      setUploading(false);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setError("Network error during upload");
+      setUploading(false);
     }
   };
 
   return (
-    <button
-      type="button"
-      onClick={openWidget}
-      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-    >
-      <svg
-        className="-ml-1 mr-2 h-5 w-5 text-gray-400"
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-      >
-        <path
-          fillRule="evenodd"
-          d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
-          clipRule="evenodd"
+    <div className="w-full">
+      <label className="block">
+        <span className="sr-only">Choose image</span>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          disabled={uploading}
+          className="block w-full text-sm text-gray-500
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-md file:border-0
+            file:text-sm file:font-semibold
+            file:bg-orange-50 file:text-[#f29f05]
+            hover:file:bg-orange-100
+            disabled:opacity-50"
         />
-      </svg>
-      {buttonText}
-    </button>
+      </label>
+
+      {uploading && (
+        <div className="mt-2">
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              className="bg-[#f29f05] h-2.5 rounded-full"
+              style={{ width: `100%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Uploading...</p>
+        </div>
+      )}
+
+      {error && <div className="mt-2 text-sm text-red-600">Error: {error}</div>}
+    </div>
   );
 };
 

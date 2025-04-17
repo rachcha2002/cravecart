@@ -27,6 +27,7 @@ export interface RegisterData {
   password: string;
   phoneNumber: string;
   role: string;
+  address: string;
   restaurantInfo: {
     restaurantName: string;
     cuisine: string[];
@@ -35,8 +36,18 @@ export interface RegisterData {
       open: string;
       close: string;
     };
-    images: { url: string; description: string }[];
+    images: ImageInfo[];
+    location: {
+      type: "Point";
+      coordinates: [number, number];
+    };
   };
+}
+
+export interface ImageInfo {
+  url: string;
+  description: string;
+  isPrimary?: boolean;
 }
 
 export class UserService {

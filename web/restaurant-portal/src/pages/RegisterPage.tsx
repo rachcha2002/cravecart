@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { RegisterData } from "../services/userService";
 import ImageUploader from "../components/ImageUploader";
+import LocationPicker from "../components/LocationPicker";
 
 interface ImageInfo {
   url: string;
@@ -19,6 +20,7 @@ const RegisterPage: React.FC = () => {
     password: "",
     phoneNumber: "",
     role: "restaurant",
+    address: "",
     restaurantInfo: {
       restaurantName: "",
       cuisine: [],
@@ -28,8 +30,37 @@ const RegisterPage: React.FC = () => {
         close: "",
       },
       images: [] as ImageInfo[],
+      location: {
+        type: "Point",
+        coordinates: [0, 0] as [number, number],
+      },
     },
   });
+
+  const [location, setLocation] = useState({
+    address: "",
+    coordinates: [0, 0] as [number, number],
+  });
+
+  const handleLocationChange = (locationData: {
+    address: string;
+    coordinates: [number, number];
+  }) => {
+    setLocation(locationData);
+
+    // Update the formData
+    setFormData((prev) => ({
+      ...prev,
+      address: locationData.address,
+      restaurantInfo: {
+        ...prev.restaurantInfo,
+        location: {
+          type: "Point",
+          coordinates: locationData.coordinates,
+        },
+      },
+    }));
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -86,20 +117,70 @@ const RegisterPage: React.FC = () => {
 
   // Handle image upload success
   const handleImageUpload = (url: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      restaurantInfo: {
-        ...prev.restaurantInfo,
-        images: [
-          ...(prev.restaurantInfo.images || []),
-          {
-            url,
-            description: "",
-            isPrimary: prev.restaurantInfo.images?.length === 0,
-          },
-        ],
-      },
-    }));
+    setFormData((prev) => {
+      const newImages = [...(prev.restaurantInfo.images || [])];
+
+      // Make first image primary by default
+      const isPrimary = newImages.length === 0;
+
+      newImages.push({
+        url,
+        description: "",
+        isPrimary,
+      });
+
+      return {
+        ...prev,
+        restaurantInfo: {
+          ...prev.restaurantInfo,
+          images: newImages,
+        },
+      };
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setFormData((prev) => {
+      const newImages = [...(prev.restaurantInfo.images || [])];
+      newImages.splice(index, 1);
+
+      // If we removed the primary image and there are other images,
+      // make the first one primary
+      if (newImages.length > 0) {
+        const hasPrimary = newImages.some((img) => img.isPrimary);
+        if (!hasPrimary) {
+          newImages[0].isPrimary = true;
+        }
+      }
+
+      return {
+        ...prev,
+        restaurantInfo: {
+          ...prev.restaurantInfo,
+          images: newImages,
+        },
+      };
+    });
+  };
+
+  // Add handler to set an image as primary
+  const setPrimaryImage = (index: number) => {
+    setFormData((prev) => {
+      const newImages = [...(prev.restaurantInfo.images || [])].map(
+        (img, i) => ({
+          ...img,
+          isPrimary: i === index,
+        })
+      );
+
+      return {
+        ...prev,
+        restaurantInfo: {
+          ...prev.restaurantInfo,
+          images: newImages,
+        },
+      };
+    });
   };
 
   return (
@@ -154,7 +235,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.name}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
 
@@ -172,7 +253,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
 
@@ -190,7 +271,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
 
@@ -208,7 +289,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.phoneNumber}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
 
@@ -226,7 +307,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.restaurantInfo.restaurantName}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
 
@@ -243,7 +324,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.restaurantInfo.cuisine[0] || ""}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 >
                   <option value="">Select cuisine type</option>
                   <option value="indian">Indian</option>
@@ -270,7 +351,7 @@ const RegisterPage: React.FC = () => {
                   rows={3}
                   value={formData.restaurantInfo.description || ""}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                   placeholder="Describe your restaurant, cuisine, and specialties..."
                 />
               </div>
@@ -289,7 +370,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.restaurantInfo.businessHours.open}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
 
@@ -307,7 +388,7 @@ const RegisterPage: React.FC = () => {
                   required
                   value={formData.restaurantInfo.businessHours.close}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
                 />
               </div>
             </div>
@@ -316,67 +397,100 @@ const RegisterPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700">
                 Restaurant Images
               </label>
-              <div className="mt-1 flex items-center">
-                <ImageUploader onUploadSuccess={handleImageUpload} />
-              </div>
+              <p className="text-xs text-gray-500 mb-2">
+                Upload photos of your restaurant, food items, and ambiance
+              </p>
+
+              <ImageUploader onUploadSuccess={handleImageUpload} />
 
               {/* Display uploaded images */}
               {formData.restaurantInfo.images &&
                 formData.restaurantInfo.images.length > 0 && (
                   <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                    {formData.restaurantInfo.images.map((image, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={image.url}
-                          alt={`Restaurant ${index + 1}`}
-                          className="h-24 w-full object-cover rounded-md"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              restaurantInfo: {
-                                ...prev.restaurantInfo,
-                                images: prev.restaurantInfo.images?.filter(
-                                  (_, i) => i !== index
-                                ),
-                              },
-                            }));
-                          }}
-                          className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full p-1"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                    {formData.restaurantInfo.images.map(
+                      (image: ImageInfo, index: number) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={image.url}
+                            alt={`Restaurant ${index + 1}`}
+                            className="h-32 w-full object-cover rounded-md"
+                          />
+
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-md"></div>
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                        {image.isPrimary && (
-                          <div className="absolute bottom-0 left-0 bg-green-500 text-white text-xs p-1 rounded-tr-md">
-                            Primary
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+
+                          {/* Primary badge or set as primary button */}
+                          {image.isPrimary ? (
+                            <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs py-1 px-2 rounded-md">
+                              Primary
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPrimaryImage(index)}
+                              className="absolute bottom-1 left-1 bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-800 text-xs py-1 px-2 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            >
+                              Set as primary
+                            </button>
+                          )}
+
+                          {/* Add description input */}
+                          <input
+                            type="text"
+                            placeholder="Image description"
+                            value={image.description || ""}
+                            onChange={(e) => {
+                              const newImages = [
+                                ...formData.restaurantInfo.images,
+                              ];
+                              newImages[index].description = e.target.value;
+                              setFormData({
+                                ...formData,
+                                restaurantInfo: {
+                                  ...formData.restaurantInfo,
+                                  images: newImages,
+                                },
+                              });
+                            }}
+                            className="w-full mt-1 text-xs border rounded p-1"
+                          />
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
+            </div>
+
+            <div className="col-span-2">
+              <LocationPicker onChange={handleLocationChange} />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="text-sm">
                 <Link
                   to="/login"
-                  className="font-medium text-orange-600 hover:text-orange-500"
+                  className="font-medium text-[#f29f05] hover:text-[#f2a706]"
                 >
                   Already have an account? Sign in
                 </Link>
@@ -387,7 +501,7 @@ const RegisterPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#f29f05] hover:bg-[#f2a706] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#f2a706] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Registering..." : "Register Restaurant"}
               </button>
