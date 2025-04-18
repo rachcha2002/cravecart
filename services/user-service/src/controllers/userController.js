@@ -627,6 +627,51 @@ const removeDefaultLocation = async (req, res) => {
   }
 };
 
+/**
+ * Deactivate own account
+ * @route PATCH /api/users/me/deactivate
+ * @access Private
+ */
+const deactivateOwnAccount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.status = "inactive";
+    user.updatedAt = Date.now();
+    await user.save();
+
+    res.json({
+      message: "Account deactivated successfully",
+      user: user.toJSON(),
+    });
+  } catch (error) {
+    console.error("Deactivate own account error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Get current user profile
+ * @route GET /api/users/me
+ * @access Private
+ */
+const getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -634,6 +679,7 @@ module.exports = {
   updateUserStatus,
   verifyUser,
   deleteUser,
+  deactivateOwnAccount,
   getNearbyRestaurants,
   updateDeliveryLocation,
   updateDeliveryAvailability,
@@ -644,4 +690,5 @@ module.exports = {
   addDefaultLocation,
   updateDefaultLocation,
   removeDefaultLocation,
+  getCurrentUser,
 };

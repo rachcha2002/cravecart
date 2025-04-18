@@ -5,13 +5,20 @@ interface LocationPickerProps {
     address: string;
     coordinates: [number, number]; // [longitude, latitude]
   }) => void;
+  initialAddress?: string;
+  initialCoordinates?: [number, number];
 }
 
-const LocationPicker: React.FC<LocationPickerProps> = ({ onChange }) => {
+const LocationPicker: React.FC<LocationPickerProps> = ({
+  onChange,
+  initialAddress = "",
+  initialCoordinates = [0, 0],
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [address, setAddress] = useState("");
-  const [coordinates, setCoordinates] = useState<[number, number]>([0, 0]);
+  const [address, setAddress] = useState(initialAddress);
+  const [coordinates, setCoordinates] =
+    useState<[number, number]>(initialCoordinates);
 
   useEffect(() => {
     // Check if Google Maps API is loaded
@@ -22,15 +29,21 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onChange }) => {
 
     if (!mapRef.current) return;
 
+    // Initialize the map with initial coordinates if available
+    const initialCenter =
+      initialCoordinates[0] !== 0 && initialCoordinates[1] !== 0
+        ? { lat: initialCoordinates[1], lng: initialCoordinates[0] }
+        : { lat: 6.9271, lng: 79.8612 }; // Default to Colombo, Sri Lanka
+
     // Initialize the map
     const map = new google.maps.Map(mapRef.current, {
-      center: { lat: 6.9271, lng: 79.8612 }, // Default to Colombo, Sri Lanka
+      center: initialCenter,
       zoom: 13,
     });
 
-    // Create a marker
+    // Create a marker at initial position
     const marker = new google.maps.Marker({
-      position: { lat: 6.9271, lng: 79.8612 },
+      position: initialCenter,
       map,
       draggable: true,
     });
@@ -41,6 +54,11 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onChange }) => {
         inputRef.current
       );
       autocomplete.bindTo("bounds", map);
+
+      // Set initial address if provided
+      if (initialAddress) {
+        inputRef.current.value = initialAddress;
+      }
 
       // Handle place selection
       autocomplete.addListener("place_changed", () => {
@@ -95,7 +113,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onChange }) => {
         }
       });
     });
-  }, [onChange]);
+  }, [onChange, initialAddress, initialCoordinates]);
 
   return (
     <div className="space-y-4">

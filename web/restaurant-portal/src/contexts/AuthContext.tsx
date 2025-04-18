@@ -5,8 +5,49 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { User, LoginResponse, RegisterData } from "../services/userService";
 import { userService } from "../services/userService";
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  phoneNumber?: string;
+  address?: string;
+  restaurantInfo?: {
+    restaurantName: string;
+    description: string;
+    cuisine: string[];
+    businessHours: {
+      open: string;
+      close: string;
+    };
+    location: {
+      type: string;
+      coordinates: [number, number];
+    };
+    images: Array<{
+      url: string;
+      description: string;
+      isPrimary?: boolean;
+      _id: string;
+      uploadedAt: string;
+    }>;
+  };
+  deliveryInfo?: {
+    currentLocation: {
+      type: string;
+      coordinates: [number, number];
+    };
+    availabilityStatus: string;
+  };
+  isVerified?: boolean;
+  status?: string;
+  defaultLocations?: any[];
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -14,7 +55,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: any) => Promise<void>;
   logout: () => void;
   clearError: () => void;
   sessionTimeRemaining: number | null;
@@ -62,6 +103,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Validates the current token and checks its expiration
   const validateToken = useCallback(() => {
     const token = localStorage.getItem("token");
+    console.log("Token from localStorage:", token ? "exists" : "not found");
+
     if (!token) {
       setSessionTimeRemaining(null);
       setIsAuthenticated(false);
@@ -71,11 +114,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
+      console.log("Token payload:", payload);
       const expiryTime = payload.exp * 1000;
       const remaining = Math.floor((expiryTime - Date.now()) / 1000);
+      console.log("Token remaining time (seconds):", remaining);
 
       // Token is expired
       if (remaining <= 0) {
+        console.log("Token has expired");
         setSessionTimeRemaining(0);
         setIsAuthenticated(false);
         return false;
@@ -86,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // If token is about to expire (within 5 minutes), try to refresh it
       if (remaining < 300) {
+        console.log("Token about to expire, refreshing...");
         refreshToken().catch((err) => {
           console.error("Error while refreshing token:", err);
         });
@@ -100,20 +147,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [refreshToken]);
 
-  // Load user data on initial mount and when token changes
+  // Load minimal user data on initial mount and when token changes
   const loadUser = useCallback(async () => {
     setLoading(true);
+    console.log("Loading user...");
 
     const isTokenValid = validateToken();
+    console.log("Token validation result:", isTokenValid);
+
     if (!isTokenValid) {
+      console.log("Token is not valid");
       setLoading(false);
       return;
     }
 
     try {
+      console.log("Fetching current user...");
       const currentUser = await userService.getCurrentUser();
-      setUser(currentUser);
+      console.log("Current user data:", currentUser);
+
+      // Store only minimal user data in the context
+      setUser({
+        _id: currentUser._id,
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
+      });
+
       setIsAuthenticated(true);
+      console.log("User authenticated successfully");
     } catch (error) {
       console.error("Failed to load user:", error);
       localStorage.removeItem("token");
@@ -171,7 +233,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setError(null);
       const response = await userService.login(email, password);
       localStorage.setItem("token", response.token);
-      setUser(response.user);
+
+      // Store only minimal user data
+      setUser({
+        _id: response.user._id,
+        name: response.user.name,
+        email: response.user.email,
+        role: response.user.role,
+      });
+
       setIsAuthenticated(true);
       validateToken(); // Initialize session time
     } catch (error: any) {
@@ -183,13 +253,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const register = async (data: RegisterData) => {
+  const register = async (data: any) => {
     try {
       setLoading(true);
       setError(null);
       const response = await userService.register(data);
       localStorage.setItem("token", response.token);
-      setUser(response.user);
+
+      // Store only minimal user data
+      setUser({
+        _id: response.user._id,
+        name: response.user.name,
+        email: response.user.email,
+        role: response.user.role,
+      });
+
       setIsAuthenticated(true);
       validateToken(); // Initialize session time
     } catch (error: any) {

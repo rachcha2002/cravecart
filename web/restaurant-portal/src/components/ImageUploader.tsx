@@ -4,11 +4,21 @@ import React, { useState } from "react";
 interface ImageUploaderProps {
   onUploadSuccess: (url: string) => void;
   buttonText?: string;
+  existingImages?: Array<{
+    url: string;
+    description: string;
+    isPrimary?: boolean;
+    _id: string;
+    uploadedAt: string;
+  }>;
+  onRemoveImage?: (imageId: string) => void;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
   onUploadSuccess,
   buttonText = "Upload Image",
+  existingImages = [],
+  onRemoveImage,
 }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +85,39 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   return (
     <div className="w-full">
+      {/* Display existing images */}
+      {existingImages.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">
+            Existing Images
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {existingImages.map((image) => (
+              <div key={image._id} className="relative group">
+                <img
+                  src={image.url}
+                  alt={image.description}
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+                {image.isPrimary && (
+                  <span className="absolute top-2 right-2 bg-[#f29f05] text-white text-xs px-2 py-1 rounded">
+                    Primary
+                  </span>
+                )}
+                {onRemoveImage && (
+                  <button
+                    onClick={() => onRemoveImage(image._id)}
+                    className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <label className="block">
         <span className="sr-only">Choose image</span>
         <input
