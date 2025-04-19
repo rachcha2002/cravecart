@@ -80,6 +80,7 @@ const Navbar = () => {
               <button
                 onClick={() => setIsCartOpen(true)}
                 className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                aria-label="Shopping cart"
               >
                 <ShoppingCartIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
                 {items.length > 0 && (

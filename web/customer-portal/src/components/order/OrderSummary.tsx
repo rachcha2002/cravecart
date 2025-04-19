@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LocationSelector from './LocationSelector';
 import { MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import { useCart } from '../../hooks/useCart';
 
-// Dummy data
+// Fallback dummy data in case cart is empty
 const dummyOrder = {
   id: 'ORD-12345',
   restaurantName: 'Tasty Bites',
@@ -21,6 +22,14 @@ const dummyOrder = {
 };
 
 const OrderSummary: React.FC = () => {
+  const navigate = useNavigate();
+  const { items, totalAmount, isEmpty } = useCart();
+  
+  // Calculate tax and delivery fee
+  const tax = totalAmount * 0.08; // 8% tax
+  const deliveryFee = 2.99;
+  const orderTotal = totalAmount + tax + deliveryFee;
+  
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [addressChanged, setAddressChanged] = useState(false);
   const [isValidatingAddress, setIsValidatingAddress] = useState(false);
@@ -28,6 +37,9 @@ const OrderSummary: React.FC = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [useCurrentLocation, setUseCurrentLocation] = useState(true);
 
+  // Generate a random order ID
+  const orderId = `ORD-${Math.floor(10000 + Math.random() * 90000)}`;
+  
   // Automatically try to get user's location on component mount
   useEffect(() => {
     if (useCurrentLocation && navigator.geolocation) {
@@ -84,6 +96,35 @@ const OrderSummary: React.FC = () => {
     }, 500); // Reduced timeout for better UX
   };
 
+  const handleProceedToPayment = () => {
+    // Create order data to pass to payment page
+    const orderData = {
+      orderId,
+      amount: orderTotal,
+      currency: 'LKR',
+      customerEmail: localStorage.getItem('userEmail') || 'customer@example.com',
+      customerName: localStorage.getItem('userName') || 'Customer',
+      deliveryAddress,
+      items: items.map(item => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    };
+
+    // Navigate to payment page with order data
+    navigate('/payment', { state: { orderData } });
+  };
+
+  // If cart is empty, use dummy data
+  const displayItems = isEmpty ? dummyOrder.items : items;
+  const displaySubtotal = isEmpty ? dummyOrder.subtotal : totalAmount;
+  const displayTax = isEmpty ? dummyOrder.tax : tax;
+  const displayDeliveryFee = isEmpty ? dummyOrder.deliveryFee : deliveryFee;
+  const displayTotal = isEmpty ? dummyOrder.total : orderTotal;
+  const restaurantName = isEmpty ? dummyOrder.restaurantName : (items[0]?.restaurantId || 'Unknown Restaurant');
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 md:p-6 w-full min-h-screen md:min-h-0 md:max-w-5xl mx-auto">
       <h2 className="text-xl md:text-3xl font-bold mb-4 md:mb-6 dark:text-white">Order Summary</h2>
@@ -91,13 +132,13 @@ const OrderSummary: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg md:text-xl font-semibold mb-2 dark:text-white">Order #{dummyOrder.id}</h3>
-            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Restaurant: {dummyOrder.restaurantName}</p>
+            <h3 className="text-lg md:text-xl font-semibold mb-2 dark:text-white">Order #{orderId}</h3>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Restaurant: {restaurantName}</p>
           </div>
           
           <div className="border-t border-b border-gray-200 dark:border-gray-700 py-3 md:py-4">
             <h3 className="text-lg md:text-xl font-semibold mb-2 md:mb-3 dark:text-white">Items</h3>
-            {dummyOrder.items.map((item) => (
+            {displayItems.map((item) => (
               <div key={item.id} className="flex justify-between mb-3 text-base md:text-lg">
                 <div>
                   <span className="font-medium dark:text-white">{item.quantity}x </span>
@@ -111,26 +152,26 @@ const OrderSummary: React.FC = () => {
           <div>
             <div className="flex justify-between mb-2 text-base md:text-lg">
               <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-              <span className="dark:text-white">${dummyOrder.subtotal.toFixed(2)}</span>
+              <span className="dark:text-white">${displaySubtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between mb-2 text-base md:text-lg">
               <span className="text-gray-600 dark:text-gray-400">Tax</span>
-              <span className="dark:text-white">${dummyOrder.tax.toFixed(2)}</span>
+              <span className="dark:text-white">${displayTax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between mb-2 text-base md:text-lg">
               <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
-              <span className="dark:text-white">${dummyOrder.deliveryFee.toFixed(2)}</span>
+              <span className="dark:text-white">${displayDeliveryFee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg md:text-xl mt-2">
               <span className="dark:text-white">Total</span>
-              <span className="dark:text-white">${dummyOrder.total.toFixed(2)}</span>
+              <span className="dark:text-white">${displayTotal.toFixed(2)}</span>
             </div>
           </div>
           
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h3 className="text-lg md:text-xl font-semibold mb-3 dark:text-white">Delivery Info</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-1 text-base md:text-lg">Estimated Time: {dummyOrder.deliveryTime}</p>
-            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Payment Method: {dummyOrder.paymentMethod}</p>
+            <p className="text-gray-600 dark:text-gray-300 mb-1 text-base md:text-lg">Estimated Time: 30-45 min</p>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Payment Method: Credit Card</p>
           </div>
         </div>
         
@@ -209,13 +250,13 @@ const OrderSummary: React.FC = () => {
           >
             Back to Home
           </Link>
-          <Link 
-            to="/payment"
-            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg ${!addressValidated ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600'}`}
-            onClick={(e) => !addressValidated && e.preventDefault()}
+          <button 
+            onClick={handleProceedToPayment}
+            disabled={!addressValidated}
+            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg ${!addressValidated ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-700'}`}
           >
             {!addressValidated ? 'Please confirm your address' : 'Proceed to Payment'}
-          </Link>
+          </button>
         </div>
       </div>
       
