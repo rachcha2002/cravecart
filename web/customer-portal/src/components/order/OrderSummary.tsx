@@ -49,6 +49,16 @@ const OrderSummary: React.FC = () => {
   }, [useCurrentLocation]);
 
   const handleAddressChange = (newAddress: string) => {
+    console.log("OrderSummary received address change:", newAddress);
+    
+    // Reset states if the address is empty
+    if (!newAddress) {
+      setValidationError(null);
+      setAddressValidated(false);
+      setDeliveryAddress('');
+      return;
+    }
+    
     // Reset states
     setValidationError(null);
     setAddressValidated(false);
@@ -70,7 +80,8 @@ const OrderSummary: React.FC = () => {
       }
       
       setIsValidatingAddress(false);
-    }, 1000);
+      console.log("Address validation complete:", newAddress, "Validated:", newAddress.length >= 10);
+    }, 500); // Reduced timeout for better UX
   };
 
   return (

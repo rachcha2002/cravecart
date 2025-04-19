@@ -27,6 +27,8 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
   const [error, setError] = useState<string | null>(null);
   const [userLocationFound, setUserLocationFound] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const [currentLocationSelected, setCurrentLocationSelected] = useState(false);
+  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
 
   // Check if viewport is mobile
   useEffect(() => {
@@ -192,27 +194,98 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
           position: newMap.getCenter(),
           animation: window.google.maps.Animation.DROP,
           icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: isMobile ? 8 : 10,
-            fillColor: "#4285F4",
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
+            url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+            scaledSize: new window.google.maps.Size(isMobile ? 32 : 40, isMobile ? 32 : 40),
+            origin: new window.google.maps.Point(0, 0),
+            anchor: new window.google.maps.Point(isMobile ? 16 : 20, isMobile ? 32 : 40)
           }
         });
         
         const newGeocoder = new window.google.maps.Geocoder();
         
-        // Set up marker drag end event
+        // Define a more robust update function that ensures UI updates
+        const updateLocationAndUI = (lat: number, lng: number) => {
+          console.log("updateLocationAndUI called with", lat, lng);
+          
+          // Create a message to show marker movement is detected
+          const messageDiv = document.createElement('div');
+          messageDiv.textContent = 'Updating location...';
+          messageDiv.style.position = 'absolute';
+          messageDiv.style.top = '60px';
+          messageDiv.style.left = '50%';
+          messageDiv.style.transform = 'translateX(-50%)';
+          messageDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
+          messageDiv.style.color = 'white';
+          messageDiv.style.padding = '8px 16px';
+          messageDiv.style.borderRadius = '4px';
+          messageDiv.style.zIndex = '9999';
+          
+          if (mapRef.current) {
+            mapRef.current.appendChild(messageDiv);
+            
+            // Auto-remove after 2 seconds
+            setTimeout(() => {
+              if (mapRef.current && mapRef.current.contains(messageDiv)) {
+                mapRef.current.removeChild(messageDiv);
+              }
+            }, 2000);
+          }
+          
+          // Do the geocoding
+          newGeocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+            if (status === 'OK' && results[0]) {
+              const formattedAddress = results[0].formatted_address;
+              
+              // Update the search box
+              if (searchBoxRef.current) {
+                searchBoxRef.current.value = formattedAddress;
+              }
+              
+              // Notify parent component
+              onLocationSelect(lat, lng, formattedAddress);
+              
+              // Direct DOM update for the address input field in the parent component
+              try {
+                const addressInput = document.querySelector('input[placeholder="Enter your delivery address"]') as HTMLInputElement;
+                if (addressInput) {
+                  addressInput.value = formattedAddress;
+                  
+                  // Create and dispatch events to trigger React state updates
+                  const changeEvent = new Event('change', { bubbles: true });
+                  addressInput.dispatchEvent(changeEvent);
+                  
+                  // Force blur to trigger save
+                  addressInput.blur();
+                }
+              } catch (e) {
+                console.error("Error with direct DOM update:", e);
+              }
+            }
+          });
+        };
+        
+        // Set up marker drag end event with the robust update function
         window.google.maps.event.addListener(newMarker, 'dragend', () => {
           const position = newMarker.getPosition();
-          reverseGeocode(position.lat(), position.lng());
+          console.log("Marker dragend event triggered", position.lat(), position.lng());
+          
+          // Use the robust update function
+          updateLocationAndUI(position.lat(), position.lng());
         });
         
-        // Set up map click event
+        // Also listen for drag events to update position in real-time
+        window.google.maps.event.addListener(newMarker, 'drag', () => {
+          const position = newMarker.getPosition();
+          // Update map center to follow marker while dragging
+          newMap.panTo(position);
+        });
+        
+        // Set up map click event with the robust update function
         window.google.maps.event.addListener(newMap, 'click', (event: any) => {
           newMarker.setPosition(event.latLng);
-          reverseGeocode(event.latLng.lat(), event.latLng.lng());
+          
+          // Use the robust update function
+          updateLocationAndUI(event.latLng.lat(), event.latLng.lng());
         });
         
         // Initialize search box if search input is available
@@ -283,7 +356,13 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
               newMap.setCenter(pos);
               newMap.setZoom(isMobile ? 16 : 15); // Closer zoom on mobile
               newMarker.setPosition(pos);
-              reverseGeocode(pos.lat, pos.lng);
+              
+              // Always reverse geocode and automatically select the location
+              if (!currentLocationSelected) {
+                reverseGeocode(pos.lat, pos.lng);
+                setCurrentLocationSelected(true);
+              }
+              
               setUserLocationFound(true);
             },
             (error) => {
@@ -304,7 +383,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
         setError('An error occurred while initializing the map. Please refresh the page.');
       }
     }
-  }, [initializing, map, address, onLocationSelect, userLocationFound, isMobile]);
+  }, [initializing, map, address, onLocationSelect, userLocationFound, isMobile, currentLocationSelected]);
 
   // Geocode address to coordinates
   const geocodeAddress = (
@@ -330,16 +409,47 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
     if (geocoder) {
       const latlng = { lat, lng };
       
+      setIsUpdatingAddress(true);
+      console.log("Starting reverse geocoding for:", lat, lng);
+      
       geocoder.geocode({ location: latlng }, (results: any, status: any) => {
         if (status === 'OK' && results[0]) {
           const formattedAddress = results[0].formatted_address;
-          onLocationSelect(lat, lng, formattedAddress);
+          console.log("Geocoding success:", formattedAddress);
+          
+          // Always update the search box with the new address when available
+          if (searchBoxRef.current) {
+            searchBoxRef.current.value = formattedAddress;
+          }
+          
+          // Notify parent component about the new location
+          // Explicit callback with new coordinates and address
+          try {
+            onLocationSelect(lat, lng, formattedAddress);
+            console.log("Location select callback executed with:", formattedAddress);
+          } catch (err) {
+            console.error("Error in location select callback:", err);
+          }
         } else {
           console.warn(`Reverse geocode was not successful for the following reason: ${status}`);
           // Still provide coordinates even if we can't get an address
-          onLocationSelect(lat, lng, `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+          const fallbackAddress = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          if (searchBoxRef.current) {
+            searchBoxRef.current.value = fallbackAddress;
+          }
+          
+          try {
+            onLocationSelect(lat, lng, fallbackAddress);
+            console.log("Location select callback executed with fallback:", fallbackAddress);
+          } catch (err) {
+            console.error("Error in location select callback with fallback:", err);
+          }
         }
+        
+        setIsUpdatingAddress(false);
       });
+    } else {
+      console.error("Geocoder not initialized");
     }
   };
 
@@ -371,6 +481,19 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
             />
           </div>
           <div ref={mapRef} className="w-full h-full rounded-md" />
+          
+          {/* Location update indicator */}
+          {isUpdatingAddress && (
+            <div className="absolute top-12 sm:top-14 left-0 right-0 z-10 flex justify-center pointer-events-none">
+              <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full text-xs shadow-lg flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Updating address...
+              </div>
+            </div>
+          )}
           
           {/* Location marker indicator for mobile devices */}
           {isMobile && (

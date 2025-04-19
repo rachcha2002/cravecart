@@ -45,7 +45,24 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           const lng = position.coords.longitude;
           
           setCoordinates({ lat, lng });
-          // We'll let the MapPreview component handle the reverse geocoding
+          
+          // Reverse geocode the coordinates to get the address
+          try {
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyCgPYZ5K8EXB0Ip5jGMASp-mAXOVzw7BTk`
+            );
+            const data = await response.json();
+            
+            if (data.status === 'OK' && data.results && data.results.length > 0) {
+              const formattedAddress = data.results[0].formatted_address;
+              setAddress(formattedAddress);
+              // Notify parent component of the address change
+              onAddressChange(formattedAddress);
+            }
+          } catch (geocodeError) {
+            console.error("Error reverse geocoding:", geocodeError);
+          }
+          
           setLoading(false);
         } catch (error) {
           setError('Failed to get address from coordinates');
@@ -94,9 +111,18 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   // Handle location selection from map
   const handleLocationSelect = (lat: number, lng: number, formattedAddress: string) => {
+    console.log("Location selected:", lat, lng, formattedAddress);
     setCoordinates({ lat, lng });
     setAddress(formattedAddress);
+    
+    // Force update the parent component immediately with the new address
     onAddressChange(formattedAddress);
+    
+    // Update the address input field in case it's not binding correctly
+    const addressInput = document.querySelector('input[placeholder="Enter your delivery address"]') as HTMLInputElement;
+    if (addressInput) {
+      addressInput.value = formattedAddress;
+    }
   };
 
   // Handle search form submission
