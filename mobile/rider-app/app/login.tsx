@@ -1,23 +1,53 @@
 // app/login.tsx
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useState } from "react";
 import { useRouter } from "expo-router";
+import { useAuth } from "../src/context/AuthContext";
 
 export default function LoginScreen() {
+  const router = useRouter();
+  const { login, loading } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const router = useRouter();
 
-  const handleLogin = () => {
-    // Add your login logic here
-    // After successful login:
-    router.replace("/(tabs)");
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password");
+      return;
+    }
+
+    try {
+      const response = await login(email, password);
+
+      // Check if the user is a delivery person
+      if (response.user.role !== "delivery") {
+        Alert.alert("Error", "This app is for delivery drivers only");
+        return;
+      }
+
+      // Check if the user is verified
+      if (!response.user.isVerified) {
+        router.replace("/verification-pending");
+        return;
+      }
+
+      // Navigate to the main app
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        "Login failed. Please check your credentials.";
+      Alert.alert("Login Error", errorMessage);
+    }
   };
 
   return (
@@ -42,8 +72,25 @@ export default function LoginScreen() {
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Sign In</Text>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.buttonText}>Sign In</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.forgotPassword}
+          onPress={() =>
+            Alert.alert("Feature", "Reset password feature coming soon")
+          }
+        >
+          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
@@ -93,10 +140,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   buttonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  forgotPassword: {
+    alignItems: "center",
+    marginTop: 15,
+  },
+  forgotPasswordText: {
+    color: "#f29f05",
+    fontSize: 14,
   },
   registerContainer: {
     flexDirection: "row",
