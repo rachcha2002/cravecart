@@ -77,7 +77,7 @@ const LoginPage: React.FC = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
               />
             </div>
 
@@ -95,7 +95,7 @@ const LoginPage: React.FC = () => {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 sm:text-sm"
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-[#f29f05] focus:outline-none focus:ring-1 focus:ring-[#f29f05] sm:text-sm"
               />
             </div>
 
@@ -103,7 +103,7 @@ const LoginPage: React.FC = () => {
               <div className="text-sm">
                 <Link
                   to="/register"
-                  className="font-medium text-orange-600 hover:text-orange-500"
+                  className="font-medium text-[#f29f05] hover:text-[#f2a706]"
                 >
                   Don't have an account? Register
                 </Link>
@@ -114,7 +114,7 @@ const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#f29f05] hover:bg-[#f2a706] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#f2a706] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Signing in..." : "Sign in"}
               </button>

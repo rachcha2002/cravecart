@@ -1,19 +1,45 @@
 import axios from "axios";
 
 export interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   role: string;
   phoneNumber: string;
+  address: string;
+  isVerified: boolean;
+  status: string;
   restaurantInfo?: {
     restaurantName: string;
+    description: string;
     cuisine: string[];
     businessHours: {
       open: string;
       close: string;
     };
+    location: {
+      type: string;
+      coordinates: [number, number];
+    };
+    images: Array<{
+      url: string;
+      description: string;
+      isPrimary?: boolean;
+      _id: string;
+      uploadedAt: string;
+    }>;
   };
+  deliveryInfo?: {
+    currentLocation: {
+      type: string;
+      coordinates: [number, number];
+    };
+    availabilityStatus: string;
+  };
+  defaultLocations?: any[];
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
 }
 
 export interface LoginResponse {
@@ -27,14 +53,27 @@ export interface RegisterData {
   password: string;
   phoneNumber: string;
   role: string;
+  address: string;
   restaurantInfo: {
     restaurantName: string;
     cuisine: string[];
+    description: string;
     businessHours: {
       open: string;
       close: string;
     };
+    images: ImageInfo[];
+    location: {
+      type: "Point";
+      coordinates: [number, number];
+    };
   };
+}
+
+export interface ImageInfo {
+  url: string;
+  description: string;
+  isPrimary?: boolean;
 }
 
 export class UserService {
@@ -163,25 +202,35 @@ export class UserService {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await this.axiosInstance.get<User>("/auth/me");
-    return response.data;
+    console.log("Making API call to /auth/me");
+    try {
+      const response = await this.axiosInstance.get<{ user: User }>("/auth/me");
+      console.log("API response:", response.data);
+      return response.data.user;
+    } catch (error) {
+      console.error("Error in getCurrentUser:", error);
+      throw error;
+    }
   }
 
   async refreshToken(token: string): Promise<{ token: string }> {
+    console.log("Attempting to refresh token");
     try {
       const response = await this.axiosInstance.post<{ token: string }>(
         "/auth/refresh-token",
         { token }
       );
+      console.log("Token refresh successful");
       return response.data;
     } catch (error) {
+      console.error("Token refresh failed, trying fallback:", error);
       // If the refresh token endpoint fails, try a silent fallback to getCurrentUser
-      // This can help with backends that don't have a dedicated refresh endpoint
       try {
         await this.getCurrentUser();
-        // If the getCurrentUser succeeds with the current token, it's still valid
+        console.log("Fallback to getCurrentUser succeeded");
         return { token };
       } catch {
+        console.error("Fallback to getCurrentUser also failed");
         throw error;
       }
     }
