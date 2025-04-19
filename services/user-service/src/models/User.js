@@ -63,12 +63,29 @@ const userSchema = new mongoose.Schema(
       licenseNumber: String,
       availabilityStatus: {
         type: String,
-        enum: ["available", "busy", "offline"],
+        enum: ["online", "offline"],
         default: "offline",
       },
       currentLocation: {
         type: { type: String, enum: ["Point"], default: "Point" },
         coordinates: { type: [Number], default: [0, 0] },
+      },
+      documents: {
+        driverLicense: {
+          url: String,
+          verified: { type: Boolean, default: false },
+          uploadedAt: { type: Date },
+        },
+        vehicleRegistration: {
+          url: String,
+          verified: { type: Boolean, default: false },
+          uploadedAt: { type: Date },
+        },
+        insurance: {
+          url: String,
+          verified: { type: Boolean, default: false },
+          uploadedAt: { type: Date },
+        },
       },
     },
     isVerified: { type: Boolean, default: false },

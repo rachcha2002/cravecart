@@ -85,4 +85,8 @@ router.get(
   userController.getAvailableDeliveryPersonnel
 );
 
+// User routes
+router.get("/me", auth, userController.getCurrentUser);
+router.patch("/me/deactivate", auth, userController.deactivateOwnAccount);
+
 module.exports = router;

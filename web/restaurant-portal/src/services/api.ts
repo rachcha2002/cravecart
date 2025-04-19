@@ -1,17 +1,17 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001/api";
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // Request interceptor for adding auth token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -22,52 +22,62 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle token expiration
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Check if the error is due to token expiration
+      const isTokenExpired = error.response?.data?.message === "Token expired";
+
+      if (isTokenExpired) {
+        // Try to refresh the token if possible
+        return refreshTokenAndRetryRequest(error);
+      } else {
+        // Otherwise, log the user out
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
     }
+
+    // Handle other server errors
+    if (error.response?.status === 500) {
+      console.error("Server error:", error.response.data);
+    }
+
     return Promise.reject(error);
   }
 );
 
-export const login = async (email: string, password: string) => {
-  const response = await api.post('/auth/login', { email, password });
-  return response.data;
-};
+// Function to refresh token and retry the failed request
+async function refreshTokenAndRetryRequest(error: any) {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("No token found");
+    }
 
-export const getOrders = async () => {
-  const response = await api.get('/orders');
-  return response.data;
-};
+    // Call token refresh endpoint
+    const response = await axios.post(`${API_URL}/auth/refresh-token`, {
+      token,
+    });
+    const newToken = response.data.token;
 
-export const getMenuItems = async () => {
-  const response = await api.get('/menu');
-  return response.data;
-};
+    // Update token in localStorage
+    localStorage.setItem("token", newToken);
 
-export const updateMenuItem = async (id: number, data: any) => {
-  const response = await api.put(`/menu/${id}`, data);
-  return response.data;
-};
+    // Update Authorization header in the original request
+    const originalRequest = error.config;
+    originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
-export const createMenuItem = async (data: any) => {
-  const response = await api.post('/menu', data);
-  return response.data;
-};
+    // Retry the original request with the new token
+    return axios(originalRequest);
+  } catch (refreshError) {
+    console.error("Token refresh failed:", refreshError);
 
-export const updateOrderStatus = async (id: number, status: string) => {
-  const response = await api.put(`/orders/${id}/status`, { status });
-  return response.data;
-};
+    // Clear token and redirect to login
+    localStorage.removeItem("token");
+    window.location.href = "/login";
 
-export const getRestaurantProfile = async () => {
-  const response = await api.get('/restaurant/profile');
-  return response.data;
-};
+    return Promise.reject(refreshError);
+  }
+}
 
-export const updateRestaurantProfile = async (data: any) => {
-  const response = await api.put('/restaurant/profile', data);
-  return response.data;
-};
-
-export default api; 
+export default api;
