@@ -8,7 +8,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 // Validate essential environment variables
-const requiredEnvVars = ['STRIPE_SECRET_KEY', 'MONGODB_URI'];
+const requiredEnvVars = ['STRIPE_SECRET_KEY_RENAMED', 'MONGODB_URI'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length) {
@@ -18,8 +18,8 @@ if (missingEnvVars.length) {
 }
 
 // Log partial keys for debugging (hiding most of sensitive information)
-console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY.substring(0, 8) + '...');
-console.log('STRIPE_PUBLISHABLE_KEY:', process.env.STRIPE_PUBLISHABLE_KEY.substring(0, 8) + '...');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY_RENAMED.substring(0, 8) + '...');
+console.log('STRIPE_PUBLISHABLE_KEY:', process.env.STRIPE_PUBLISHABLE_KEY_RENAMED.substring(0, 8) + '...');
 console.log('MONGODB_URI:', process.env.MONGODB_URI.split('@')[0] + '...');
 
 // Import routes
@@ -42,7 +42,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok',
     env: process.env.NODE_ENV || 'development',
-    stripe: process.env.STRIPE_PUBLISHABLE_KEY ? 'configured' : 'missing'
+    stripe: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED ? 'configured' : 'missing'
   });
 });
 
@@ -54,9 +54,9 @@ app.get('/debug-config', (req, res) => {
   
   res.status(200).json({
     environment: process.env.NODE_ENV || 'development',
-    stripeSecretKeyExists: !!process.env.STRIPE_SECRET_KEY,
-    stripePublishableKeyExists: !!process.env.STRIPE_PUBLISHABLE_KEY,
-    stripePublishableKeyPrefix: process.env.STRIPE_PUBLISHABLE_KEY?.substring(0, 7),
+    stripeSecretKeyExists: !!process.env.STRIPE_SECRET_KEY_RENAMED,
+    stripePublishableKeyExists: !!process.env.STRIPE_PUBLISHABLE_KEY_RENAMED,
+    stripePublishableKeyPrefix: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED?.substring(0, 7),
     mongodbUriExists: !!process.env.MONGODB_URI
   });
 });

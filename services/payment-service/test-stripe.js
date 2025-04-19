@@ -1,10 +1,19 @@
 require('dotenv').config();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY_RENAMED);
+
+// Log the first part of the key to confirm it's being read
+console.log('Starting Stripe connection test...');
+if (!process.env.STRIPE_SECRET_KEY_RENAMED) {
+  console.error('ERROR: STRIPE_SECRET_KEY_RENAMED is not defined in environment variables');
+  console.log('Available environment variables:', Object.keys(process.env).filter(key => key.includes('STRIPE')));
+  process.exit(1);
+}
+console.log('Using API key starting with:', process.env.STRIPE_SECRET_KEY_RENAMED?.substring(0, 8) + '...');
 
 async function testStripeConnection() {
   try {
     console.log('Starting Stripe connection test...');
-    console.log('Using API key starting with:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
+    console.log('Using API key starting with:', process.env.STRIPE_SECRET_KEY_RENAMED?.substring(0, 8) + '...');
     
     // Using Stripe's predefined test token instead of creating one with raw card data
     const testToken = 'tok_visa'; // This is a predefined token for a test Visa card

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY_RENAMED);
 
 // Health check route
 router.get('/health', (req, res) => {
@@ -64,10 +64,10 @@ router.get('/test-stripe-connection', async (req, res) => {
     console.log('Testing Stripe API connection');
     
     // First check that we have a valid Stripe key
-    if (!process.env.STRIPE_SECRET_KEY) {
+    if (!process.env.STRIPE_SECRET_KEY_RENAMED) {
       return res.status(500).json({
         success: false,
-        message: 'STRIPE_SECRET_KEY is not configured'
+        message: 'STRIPE_SECRET_KEY_RENAMED is not configured'
       });
     }
     
@@ -93,8 +93,8 @@ router.get('/test-stripe-connection', async (req, res) => {
       testResults: {
         customerCreated: !!testCustomer.id,
         customerDeleted: !!deletedCustomer.deleted,
-        secretKeyPrefix: process.env.STRIPE_SECRET_KEY.substring(0, 7) + '...',
-        publishableKeyPrefix: process.env.STRIPE_PUBLISHABLE_KEY.substring(0, 7) + '...'
+        secretKeyPrefix: process.env.STRIPE_SECRET_KEY_RENAMED.substring(0, 7) + '...',
+        publishableKeyPrefix: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED.substring(0, 7) + '...'
       }
     });
   } catch (error) {
@@ -113,7 +113,7 @@ router.get('/test-stripe-connection', async (req, res) => {
 router.get('/stripe-config', (req, res) => {
   res.status(200).json({
     success: true,
-    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED
   });
 });
 

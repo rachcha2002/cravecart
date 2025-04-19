@@ -1,4 +1,4 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY_RENAMED, {
   apiVersion: '2022-11-15', // Specify the API version for consistency
   maxNetworkRetries: 2, // Add automatic retrying for better reliability
 });
@@ -132,7 +132,7 @@ exports.createPaymentIntent = async (req, res) => {
             success: true,
             clientSecret: existingIntent.client_secret,
             paymentIntentId: existingIntent.id,
-            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED,
             message: 'Using existing payment intent'
           });
         }
@@ -143,7 +143,7 @@ exports.createPaymentIntent = async (req, res) => {
     }
 
     // To debug Stripe key
-    console.log('Using Stripe key:', process.env.STRIPE_SECRET_KEY?.substring(0, 8) + '...');
+    console.log('Using Stripe key:', process.env.STRIPE_SECRET_KEY_RENAMED?.substring(0, 8) + '...');
 
     const amountInCents = Math.round(amountValue * 100); // Stripe requires amounts in cents
     console.log('Creating payment intent with Stripe:', { 
@@ -189,13 +189,13 @@ exports.createPaymentIntent = async (req, res) => {
             amount: testIntent.amount / 100,
             currency: testIntent.currency
           },
-          publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
+          publishableKey: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED
         });
       }
       
       return res.status(200).json({
         success: true,
-        publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+        publishableKey: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED,
         testDetails: {
           amountReceived: amountValue,
           amountInCents: amountInCents,
@@ -249,7 +249,7 @@ exports.createPaymentIntent = async (req, res) => {
       success: true,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY_RENAMED
     });
   } catch (error) {
     const { message, statusCode } = handleStripeError(error);
