@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import LocationSelector from './LocationSelector';
+import { MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 
 // Dummy data
 const dummyOrder = {
@@ -15,73 +17,199 @@ const dummyOrder = {
   deliveryFee: 2.99,
   total: 39.65,
   paymentMethod: 'Credit Card',
-  deliveryAddress: '123 Main St, Anytown, USA',
   deliveryTime: '30-45 min',
 };
 
 const OrderSummary: React.FC = () => {
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [addressChanged, setAddressChanged] = useState(false);
+  const [isValidatingAddress, setIsValidatingAddress] = useState(false);
+  const [addressValidated, setAddressValidated] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+
+  // Automatically try to get user's location on component mount
+  useEffect(() => {
+    if (useCurrentLocation && navigator.geolocation) {
+      setIsValidatingAddress(true);
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          // Success - the LocationSelector will handle the actual geolocation
+          // We're just checking if geolocation is available here
+          setIsValidatingAddress(false);
+        },
+        (error) => {
+          // Error getting location
+          console.log("Geolocation error:", error);
+          setIsValidatingAddress(false);
+          setUseCurrentLocation(false);
+        }
+      );
+    }
+  }, [useCurrentLocation]);
+
+  const handleAddressChange = (newAddress: string) => {
+    // Reset states
+    setValidationError(null);
+    setAddressValidated(false);
+    
+    // In a real app, you would validate the address with your delivery service
+    // For demo purposes, we'll simulate a brief validation process
+    setIsValidatingAddress(true);
+    
+    setTimeout(() => {
+      setDeliveryAddress(newAddress);
+      
+      // Simulate validation success (in a real app, this would be a real validation)
+      // For demo, just check if address is long enough to be valid
+      if (newAddress.length < 10) {
+        setValidationError('Please enter a more specific address for accurate delivery.');
+      } else {
+        setAddressValidated(true);
+        setAddressChanged(true);
+      }
+      
+      setIsValidatingAddress(false);
+    }, 1000);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 md:p-6 w-full min-h-screen md:min-h-0 md:max-w-5xl mx-auto">
+      <h2 className="text-xl md:text-3xl font-bold mb-4 md:mb-6 dark:text-white">Order Summary</h2>
       
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Order #{dummyOrder.id}</h3>
-        <p className="text-gray-600">Restaurant: {dummyOrder.restaurantName}</p>
-      </div>
-      
-      <div className="border-t border-b border-gray-200 py-4 mb-4">
-        <h3 className="text-lg font-semibold mb-3">Items</h3>
-        {dummyOrder.items.map((item) => (
-          <div key={item.id} className="flex justify-between mb-2">
-            <div>
-              <span className="font-medium">{item.quantity}x </span>
-              <span>{item.name}</span>
-            </div>
-            <span>${(item.price * item.quantity).toFixed(2)}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg md:text-xl font-semibold mb-2 dark:text-white">Order #{dummyOrder.id}</h3>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Restaurant: {dummyOrder.restaurantName}</p>
           </div>
-        ))}
+          
+          <div className="border-t border-b border-gray-200 dark:border-gray-700 py-3 md:py-4">
+            <h3 className="text-lg md:text-xl font-semibold mb-2 md:mb-3 dark:text-white">Items</h3>
+            {dummyOrder.items.map((item) => (
+              <div key={item.id} className="flex justify-between mb-3 text-base md:text-lg">
+                <div>
+                  <span className="font-medium dark:text-white">{item.quantity}x </span>
+                  <span className="dark:text-gray-300">{item.name}</span>
+                </div>
+                <span className="dark:text-white">${(item.price * item.quantity).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          
+          <div>
+            <div className="flex justify-between mb-2 text-base md:text-lg">
+              <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+              <span className="dark:text-white">${dummyOrder.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between mb-2 text-base md:text-lg">
+              <span className="text-gray-600 dark:text-gray-400">Tax</span>
+              <span className="dark:text-white">${dummyOrder.tax.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between mb-2 text-base md:text-lg">
+              <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+              <span className="dark:text-white">${dummyOrder.deliveryFee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg md:text-xl mt-2">
+              <span className="dark:text-white">Total</span>
+              <span className="dark:text-white">${dummyOrder.total.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h3 className="text-lg md:text-xl font-semibold mb-3 dark:text-white">Delivery Info</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-1 text-base md:text-lg">Estimated Time: {dummyOrder.deliveryTime}</p>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Payment Method: {dummyOrder.paymentMethod}</p>
+          </div>
+        </div>
+        
+        <div className="border-t lg:border-t-0 lg:border-l border-gray-200 dark:border-gray-700 pt-4 lg:pt-0 lg:pl-6">
+          <h3 className="text-lg md:text-xl font-semibold mb-3 dark:text-white">Delivery Details</h3>
+          
+          <div className="mb-4">
+            <div className="flex items-start mb-3">
+              <MapPinIcon className={`h-6 w-6 mt-1 mr-2 flex-shrink-0 ${addressValidated ? 'text-green-500' : 'text-blue-500'}`} />
+              <div>
+                <p className="font-medium text-gray-700 dark:text-gray-200 text-base md:text-lg">Delivery Address</p>
+                {deliveryAddress && !isValidatingAddress ? (
+                  <div className="flex items-center">
+                    <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">{deliveryAddress}</p>
+                    {addressValidated && (
+                      <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-400 dark:text-gray-500 italic text-base md:text-lg">
+                    {isValidatingAddress ? 'Getting your location...' : 'Please set your delivery address'}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 md:p-5 mb-4">
+              <h4 className="font-medium text-blue-700 dark:text-blue-300 mb-1 text-base md:text-lg">Delivery Location</h4>
+              <p className="text-sm md:text-base text-blue-600 dark:text-blue-300 mb-2 md:mb-3">
+                We need your exact delivery location. The quickest way is to:
+              </p>
+              <ul className="text-sm md:text-base text-blue-600 dark:text-blue-300 list-disc pl-5 mb-2 md:mb-3">
+                <li className="font-medium">Click "Use Current Location" below (recommended)</li>
+                <li>Or enter your address manually</li>
+                <li>Or search for an address using the map</li>
+                <li>Or click directly on the map to select a location</li>
+              </ul>
+              
+              <LocationSelector 
+                initialAddress={deliveryAddress} 
+                onAddressChange={handleAddressChange} 
+              />
+            </div>
+            
+            {isValidatingAddress && (
+              <p className="text-sm md:text-base text-blue-600 dark:text-blue-400 animate-pulse flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Validating address...
+              </p>
+            )}
+            
+            {validationError && (
+              <p className="text-sm md:text-base text-red-600 dark:text-red-400 mt-1">
+                {validationError}
+              </p>
+            )}
+            
+            {addressChanged && addressValidated && !isValidatingAddress && (
+              <p className="text-sm md:text-base text-green-600 dark:text-green-400 mt-1 flex items-center">
+                <CheckCircleIcon className="h-5 w-5 mr-1" />
+                Delivery address updated successfully!
+              </p>
+            )}
+          </div>
+        </div>
       </div>
       
-      <div className="mb-6">
-        <div className="flex justify-between mb-2">
-          <span className="text-gray-600">Subtotal</span>
-          <span>${dummyOrder.subtotal.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between mb-2">
-          <span className="text-gray-600">Tax</span>
-          <span>${dummyOrder.tax.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between mb-2">
-          <span className="text-gray-600">Delivery Fee</span>
-          <span>${dummyOrder.deliveryFee.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between font-bold text-lg mt-2">
-          <span>Total</span>
-          <span>${dummyOrder.total.toFixed(2)}</span>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 shadow-md-up border-t border-gray-200 dark:border-gray-700 md:relative md:p-0 md:bg-transparent dark:md:bg-transparent md:shadow-none md:border-t-0 md:mt-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-2 md:mt-0 max-w-5xl mx-auto">
+          <Link 
+            to="/"
+            className="px-4 py-3 md:py-3 text-center text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 w-full md:w-auto text-base md:text-lg"
+          >
+            Back to Home
+          </Link>
+          <Link 
+            to="/payment"
+            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg ${!addressValidated ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600'}`}
+            onClick={(e) => !addressValidated && e.preventDefault()}
+          >
+            {!addressValidated ? 'Please confirm your address' : 'Proceed to Payment'}
+          </Link>
         </div>
       </div>
       
-      <div className="border-t border-gray-200 pt-4 mb-6">
-        <h3 className="text-lg font-semibold mb-2">Delivery Details</h3>
-        <p className="text-gray-600 mb-1">Address: {dummyOrder.deliveryAddress}</p>
-        <p className="text-gray-600 mb-1">Estimated Time: {dummyOrder.deliveryTime}</p>
-        <p className="text-gray-600">Payment Method: {dummyOrder.paymentMethod}</p>
-      </div>
-      
-      <div className="flex justify-between">
-        <Link 
-          to="/"
-          className="px-4 py-2 text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-        >
-          Back to Home
-        </Link>
-        <Link 
-          to="/payment"
-          className="px-4 py-2 text-white bg-green-600 rounded hover:bg-green-700"
-        >
-          Proceed to Payment
-        </Link>
-      </div>
+      {/* Add bottom padding to account for fixed button bar on mobile */}
+      <div className="h-24 md:h-0 block md:hidden"></div>
     </div>
   );
 };
