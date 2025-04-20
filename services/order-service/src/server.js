@@ -19,7 +19,11 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Routes will be added here
+// Import routes
+const orderRoutes = require('./routes/order.routes');
+
+// Register routes
+app.use('/api/orders', orderRoutes);
 
 // Start the server
 const PORT = process.env.PORT || 3000;

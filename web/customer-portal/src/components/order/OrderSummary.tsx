@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import LocationSelector from './LocationSelector';
 import { MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../contexts/AuthContext';
+import orderService from '../../services/orderService';
+import { toast } from 'react-hot-toast';
 
 // Fallback dummy data in case cart is empty
 const dummyOrder = {
@@ -21,9 +24,74 @@ const dummyOrder = {
   deliveryTime: '30-45 min',
 };
 
+// Sample restaurant data (static for now)
+const sampleRestaurant = {
+  "restaurantInfo": {
+    "businessHours": {
+      "open": "10:00",
+      "close": "21:00"
+    },
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        79.8747612487793,
+        6.928292856723946
+      ]
+    },
+    "restaurantName": "Perera Indian Restaurant",
+    "description": "Perera Indian Restaurant offers authentic Indian cuisine in a warm, cozy setting with elegant decor and a welcoming vibe.",
+    "cuisine": [
+      "indian"
+    ],
+    "images": [
+      {
+        "url": "https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745080636/xfawdqq9rcke1kwr1fw2.png",
+        "description": "",
+        "isPrimary": true,
+        "_id": "6803d14c69261470e97ecc5c",
+        "uploadedAt": "2025-04-19T16:37:32.327Z"
+      }
+    ]
+  },
+  "deliveryInfo": {
+    "currentLocation": {
+      "type": "Point",
+      "coordinates": [
+        0,
+        0
+      ]
+    },
+    "documents": {
+      "driverLicense": {
+        "verified": false
+      },
+      "vehicleRegistration": {
+        "verified": false
+      },
+      "insurance": {
+        "verified": false
+      }
+    },
+    "availabilityStatus": "offline"
+  },
+  "_id": "6803d14c69261470e97ecc5b",
+  "name": "Janaka Perera",
+  "email": "jperera@gmail.com",
+  "phoneNumber": "0714804203",
+  "role": "restaurant",
+  "address": "213 Siri Dhamma Mawatha, Colombo 01000, Sri Lanka",
+  "isVerified": true,
+  "status": "active",
+  "defaultLocations": [],
+  "createdAt": "2025-04-19T16:37:32.328Z",
+  "updatedAt": "2025-04-19T16:37:32.328Z",
+  "__v": 0
+};
+
 const OrderSummary: React.FC = () => {
   const navigate = useNavigate();
-  const { items, totalAmount, isEmpty } = useCart();
+  const { items, totalAmount, isEmpty, clearCart } = useCart();
+  const { user } = useAuth();
   
   // Calculate tax and delivery fee
   const tax = totalAmount * 0.08; // 8% tax
@@ -36,6 +104,8 @@ const OrderSummary: React.FC = () => {
   const [addressValidated, setAddressValidated] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+  const [locationCoordinates, setLocationCoordinates] = useState<{latitude: number, longitude: number} | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Generate a random order ID
   const orderId = `ORD-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -45,9 +115,12 @@ const OrderSummary: React.FC = () => {
     if (useCurrentLocation && navigator.geolocation) {
       setIsValidatingAddress(true);
       navigator.geolocation.getCurrentPosition(
-        () => {
-          // Success - the LocationSelector will handle the actual geolocation
-          // We're just checking if geolocation is available here
+        (position) => {
+          // Store coordinates
+          setLocationCoordinates({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
           setIsValidatingAddress(false);
         },
         (error) => {
@@ -96,25 +169,73 @@ const OrderSummary: React.FC = () => {
     }, 500); // Reduced timeout for better UX
   };
 
-  const handleProceedToPayment = () => {
-    // Create order data to pass to payment page
-    const orderData = {
-      orderId,
-      amount: orderTotal,
-      currency: 'LKR',
-      customerEmail: localStorage.getItem('userEmail') || 'customer@example.com',
-      customerName: localStorage.getItem('userName') || 'Customer',
-      deliveryAddress,
-      items: items.map(item => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price
-      }))
-    };
+  const handleLocationSelect = (lat: number, lng: number) => {
+    setLocationCoordinates({
+      latitude: lat,
+      longitude: lng
+    });
+  };
 
-    // Navigate to payment page with order data
-    navigate('/payment', { state: { orderData } });
+  const handleProceedToPayment = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Make sure we have coordinates
+      if (!locationCoordinates) {
+        toast.error("Please select a delivery location");
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Create order data for saving to order service
+      const orderData = {
+        orderId,
+        user: user || {
+          id: "guest-user",
+          name: localStorage.getItem('userName') || 'Guest User',
+          email: localStorage.getItem('userEmail') || 'guest@example.com',
+        },
+        restaurant: sampleRestaurant,
+        foods: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          // Include any other food item properties here
+        })),
+        subtotal: totalAmount,
+        tax,
+        deliveryFee,
+        total: orderTotal,
+        paymentStatus: 'pending',
+        paymentId: `PAY-${Math.floor(10000 + Math.random() * 90000)}`, // Payment ID will be updated after payment
+        paymentMethod: 'card', // Default payment method
+        deliveryAddress,
+        deliveryLocation: locationCoordinates,
+        estimatedDeliveryTime: new Date(Date.now() + 45 * 60 * 1000) // 45 minutes from now
+      };
+      
+      // Save the order to the order service
+      const createdOrder = await orderService.createOrder(orderData);
+      console.log('Order created:', createdOrder);
+      
+      // Create payment data
+      const paymentData = {
+        orderId,
+        amount: orderTotal,
+        currency: 'LKR',
+        customerEmail: user?.email || localStorage.getItem('userEmail') || 'customer@example.com',
+        customerName: user?.name || localStorage.getItem('userName') || 'Customer'
+      };
+
+      // Navigate to payment page with payment data
+      navigate('/payment', { state: { orderData: paymentData } });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Failed to create order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // If cart is empty, use dummy data
@@ -212,7 +333,8 @@ const OrderSummary: React.FC = () => {
               
               <LocationSelector 
                 initialAddress={deliveryAddress} 
-                onAddressChange={handleAddressChange} 
+                onAddressChange={handleAddressChange}
+                onLocationSelect={handleLocationSelect}
               />
             </div>
             
@@ -252,10 +374,19 @@ const OrderSummary: React.FC = () => {
           </Link>
           <button 
             onClick={handleProceedToPayment}
-            disabled={!addressValidated}
-            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg ${!addressValidated ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-700'}`}
+            disabled={!addressValidated || isProcessing}
+            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg flex justify-center items-center
+              ${(!addressValidated || isProcessing) ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-700'}`}
           >
-            {!addressValidated ? 'Please confirm your address' : 'Proceed to Payment'}
+            {isProcessing ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : !addressValidated ? 'Please confirm your address' : 'Proceed to Payment'}
           </button>
         </div>
       </div>

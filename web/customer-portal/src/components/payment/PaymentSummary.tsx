@@ -9,6 +9,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { useCart } from '../../hooks/useCart';
 import paymentService from '../../services/paymentService';
+import orderService from '../../services/orderService';
 
 // Define options for CardElement with better styling
 const CARD_ELEMENT_OPTIONS = {
@@ -171,11 +172,23 @@ const PaymentForm = () => {
         console.error('Payment error:', result.error);
         
         if (result.error.type === 'card_error') {
+          // Update order payment status to 'failed' for card errors
+          if (orderData.orderId) {
+            try {
+              console.log('Updating order payment status to failed for order:', orderData.orderId);
+              orderService.updatePaymentStatus(orderData.orderId, 'failed')
+                .then(result => console.log('Order payment status updated to failed:', result))
+                .catch(error => console.error('Failed to update order payment status to failed:', error));
+            } catch (error) {
+              console.error('Error updating order payment status to failed:', error);
+            }
+          }
+          
           // Handle card errors (like declined card)
           handlePaymentError(result.error.message || 'Your card was declined', false);
         } else {
           // Handle other types of errors
-          handlePaymentError(result.error.message || 'An error occurred while processing your payment.');
+          handlePaymentError(result.error.message || 'An error occurred while processing your payment.', true);
         }
       } else if (result.paymentIntent?.status === 'succeeded') {
         console.log('Payment successful:', result.paymentIntent);
@@ -190,6 +203,18 @@ const PaymentForm = () => {
           
           // Clear the cart after successful payment
           clearCart();
+          
+          // Update the order payment status to 'completed'
+          if (orderData.orderId) {
+            try {
+              console.log('Updating order payment status to completed for order:', orderData.orderId);
+              const orderUpdateResult = await orderService.updatePaymentStatus(orderData.orderId, 'completed');
+              console.log('Order payment status updated successfully:', orderUpdateResult);
+            } catch (orderUpdateError) {
+              console.error('Failed to update order payment status:', orderUpdateError);
+              // Continue with navigation even if order update fails - payment was successful
+            }
+          }
           
           // Navigate to success page
           navigate('/payment/success', { 
@@ -223,6 +248,18 @@ const PaymentForm = () => {
   const handlePaymentError = (errorMessage: string, navigateAway = false) => {
     // Always set the error message
     setPaymentError(errorMessage);
+    
+    // Update order payment status to 'failed' for serious errors
+    if (navigateAway && orderData?.orderId) {
+      try {
+        console.log('Updating order payment status to failed for order:', orderData.orderId);
+        orderService.updatePaymentStatus(orderData.orderId, 'failed')
+          .then(result => console.log('Order payment status updated to failed:', result))
+          .catch(error => console.error('Failed to update order payment status to failed:', error));
+      } catch (error) {
+        console.error('Error updating order payment status to failed:', error);
+      }
+    }
     
     // For serious errors, navigate to the failed payment page
     if (navigateAway) {
