@@ -40,6 +40,8 @@ export default function RootLayout() {
           <Stack.Screen name="login" />
           <Stack.Screen name="register" />
           <Stack.Screen name="verification-pending" />
+          <Stack.Screen name="change-password" />
+          <Stack.Screen name="update-documents" />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />

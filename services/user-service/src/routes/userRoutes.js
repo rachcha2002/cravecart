@@ -85,6 +85,25 @@ router.get(
   userController.getAvailableDeliveryPersonnel
 );
 
+// Profile picture update route (for all users)
+router.patch("/profile-picture", auth, userController.updateProfilePicture);
+
+// Delivery document routes (for delivery personnel)
+router.patch(
+  "/delivery/documents",
+  auth,
+  isDelivery,
+  userController.updateDeliveryDocuments
+);
+
+// Admin route to verify delivery documents
+router.patch(
+  "/:id/delivery/documents/:documentType/verify",
+  auth,
+  isAdmin,
+  userController.verifyDeliveryDocument
+);
+
 // User routes
 router.get("/me", auth, userController.getCurrentUser);
 router.patch("/me/deactivate", auth, userController.deactivateOwnAccount);

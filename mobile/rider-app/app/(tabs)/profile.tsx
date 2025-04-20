@@ -127,6 +127,7 @@ export default function Profile() {
   };
 
   // Handle logout
+  // In app/(tabs)/profile.tsx
   const handleLogout = async () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
@@ -134,12 +135,9 @@ export default function Profile() {
         text: "Logout",
         style: "destructive",
         onPress: async () => {
-          try {
-            await logout();
-            router.replace("/");
-          } catch (error) {
-            console.error("Logout error:", error);
-          }
+          await logout(() => {
+            router.replace("/"); // Navigate to landing screen
+          });
         },
       },
     ]);
@@ -318,6 +316,20 @@ export default function Profile() {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push("/change-password")}
+          >
+            <FontAwesome5 name="key" size={20} color="#f29f05" />
+            <Text style={styles.actionButtonText}>Change Password</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push("/update-documents")}
+          >
+            <FontAwesome5 name="file-alt" size={20} color="#f29f05" />
+            <Text style={styles.actionButtonText}>Update Documents</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
             <FontAwesome5 name="cog" size={20} color="#f29f05" />
             <Text style={styles.actionButtonText}>Settings</Text>
