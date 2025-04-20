@@ -23,7 +23,8 @@ interface AuthContextType {
     name: string,
     email: string,
     password: string,
-    phoneNumber: string
+    phoneNumber: string,
+    address: string
   ) => Promise<boolean>;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<boolean>;
@@ -120,7 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     name: string,
     email: string,
     password: string,
-    phoneNumber: string
+    phoneNumber: string,
+    address: string
   ): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
@@ -131,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         password,
         phoneNumber,
+        address,
         role: "customer",
       });
 

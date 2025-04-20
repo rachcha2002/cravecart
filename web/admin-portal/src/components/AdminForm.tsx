@@ -9,6 +9,7 @@ interface AdminFormProps {
     name: string;
     email: string;
     phoneNumber: string;
+    address?: string;
   };
   onSuccess: () => void;
   onCancel: () => void;
@@ -25,6 +26,7 @@ const AdminForm = ({
     email: adminData?.email || "admin@example.com",
     password: "adminpassword123",
     phoneNumber: adminData?.phoneNumber || "1234567893",
+    address: adminData?.address || "123 Admin Street, Admin City",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,7 @@ const AdminForm = ({
             name: formData.name,
             email: formData.email,
             phoneNumber: formData.phoneNumber,
+            address: formData.address,
           },
           {
             headers: { Authorization: `Bearer ${token}` },
@@ -151,6 +154,24 @@ const AdminForm = ({
                 setFormData({ ...formData, phoneNumber: e.target.value })
               }
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f29f05] focus:ring-[#f29f05] sm:text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="address"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Address
+            </label>
+            <textarea
+              id="address"
+              value={formData.address}
+              onChange={(e) =>
+                setFormData({ ...formData, address: e.target.value })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#f29f05] focus:ring-[#f29f05] sm:text-sm"
+              rows={3}
               required
             />
           </div>
