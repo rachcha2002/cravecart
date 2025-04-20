@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import OrdersPage from './pages/OrdersPage';
+import OrderDetailPage from './pages/order/OrderDetailPage';
 import AboutUsPage from './pages/AboutUsPage';
 import ContactUs from './pages/ContactUs';
 import NotFoundPage from './pages/NotFoundPage';
@@ -35,14 +36,24 @@ const Routes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="orders"
-          element={
-            <ProtectedRoute>
-              <OrdersPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="orders">
+          <Route
+            index
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path=":id"
+            element={
+              <ProtectedRoute>
+                <OrderDetailPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
         <Route path="order">
           <Route path="cart" element={<CartPage />} />
           <Route path="summary" element={<OrderSummaryPage />} />

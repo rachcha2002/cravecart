@@ -51,6 +51,12 @@ const Navbar = () => {
                   >
                     Contact
                   </Link>
+                  <Link
+                    to="/orders"
+                    className="text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    My Orders
+                  </Link>
                 </div>
               </div>
             </div>

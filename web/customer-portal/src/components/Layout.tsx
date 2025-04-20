@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,11 +15,20 @@ const Layout: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
 
-  const navItems = [
-    { label: "Home", path: "/" },
-    { label: "About", path: "/about" },
-    { label: "Contact", path: "/contact" },
-  ];
+  const navItems = useMemo(() => {
+    const items = [
+      { label: "Home", path: "/" },
+      { label: "About", path: "/about" },
+      { label: "Contact", path: "/contact" },
+    ];
+    
+    // Add "My Orders" only for authenticated users
+    if (user) {
+      items.push({ label: "My Orders", path: "/orders" });
+    }
+    
+    return items;
+  }, [user]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -204,6 +213,13 @@ const Layout: React.FC = () => {
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Profile
+                    </Link>
+                    <Link
+                      to="/orders"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      My Orders
                     </Link>
                     <button
                       onClick={() => {
