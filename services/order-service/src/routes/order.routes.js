@@ -11,6 +11,9 @@ router.get('/', orderController.getAllOrders);
 // Get orders by user ID
 router.get('/user/:userId', orderController.getUserOrders);
 
+// Get orders by restaurant ID
+router.get('/restaurant/:restaurantId', orderController.getRestaurantOrders);
+
 // Get order by ID
 router.get('/:orderId', orderController.getOrderById);
 

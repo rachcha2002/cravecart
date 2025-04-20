@@ -258,4 +258,27 @@ exports.updateDriverLocation = async (req, res) => {
       message: error.message
     });
   }
+};
+
+// Get orders by restaurant ID with completed payment
+exports.getRestaurantOrders = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    const orders = await Order.find({ 
+      'restaurant._id': restaurantId,
+      'paymentStatus': 'completed'
+    }).sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: orders.length,
+      data: orders
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 }; 
