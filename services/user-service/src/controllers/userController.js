@@ -741,11 +741,9 @@ const updateDeliveryDocuments = async (req, res) => {
     }
 
     if (user.role !== "delivery") {
-      return res
-        .status(403)
-        .json({
-          message: "Only delivery personnel can update delivery documents",
-        });
+      return res.status(403).json({
+        message: "Only delivery personnel can update delivery documents",
+      });
     }
 
     if (!user.deliveryInfo) {
@@ -833,6 +831,79 @@ const verifyDeliveryDocument = async (req, res) => {
   }
 };
 
+/**
+ * Reset user password (admin only)
+ * @route POST /api/users/:id/reset-password
+ * @access Private/Admin
+ */
+const resetUserPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generate a random password
+    const newPassword = Math.random().toString(36).slice(-8);
+
+    // Update user's password
+    user.password = newPassword;
+    user.updatedAt = Date.now();
+    await user.save();
+
+    // TODO: Send email with new password
+    // For now, we'll just return the new password
+    // In production, this should be sent via email
+    res.json({
+      message: "Password reset successful",
+      newPassword: newPassword, // Remove this in production
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Create new admin user (admin only)
+ * @route POST /api/users/admin
+ * @access Private/Admin
+ */
+const createAdmin = async (req, res) => {
+  try {
+    const { name, email, password, phoneNumber } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    // Create new admin user
+    const admin = new User({
+      name,
+      email,
+      password,
+      phoneNumber,
+      role: "admin",
+      isVerified: true,
+      status: "active",
+    });
+
+    await admin.save();
+
+    res.status(201).json({
+      message: "Admin user created successfully",
+      user: admin.toJSON(),
+    });
+  } catch (error) {
+    console.error("Create admin error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -855,4 +926,6 @@ module.exports = {
   updateProfilePicture,
   updateDeliveryDocuments,
   verifyDeliveryDocument,
+  resetUserPassword,
+  createAdmin,
 };

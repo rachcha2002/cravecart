@@ -14,6 +14,13 @@ router.get("/", auth, isAdmin, userController.getAllUsers);
 router.patch("/:id/status", auth, isAdmin, userController.updateUserStatus);
 router.patch("/:id/verify", auth, isAdmin, userController.verifyUser);
 router.delete("/:id", auth, isAdmin, userController.deleteUser);
+router.post(
+  "/:id/reset-password",
+  auth,
+  isAdmin,
+  userController.resetUserPassword
+);
+router.post("/admin", auth, isAdmin, userController.createAdmin);
 
 // User routes (admin or self)
 router.get("/:id", auth, userController.getUserById);
