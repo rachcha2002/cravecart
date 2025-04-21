@@ -5,11 +5,13 @@ import MapPreview from './MapPreview';
 interface LocationSelectorProps {
   initialAddress?: string;
   onAddressChange: (address: string) => void;
+  onLocationSelect?: (lat: number, lng: number) => void;
 }
 
 const LocationSelector: React.FC<LocationSelectorProps> = ({ 
   initialAddress = '', 
-  onAddressChange 
+  onAddressChange,
+  onLocationSelect
 }) => {
   const [address, setAddress] = useState(initialAddress);
   const [showMap, setShowMap] = useState(false);
@@ -45,6 +47,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           const lng = position.coords.longitude;
           
           setCoordinates({ lat, lng });
+          
+          // Notify parent component of the location change if callback exists
+          if (onLocationSelect) {
+            onLocationSelect(lat, lng);
+          }
           
           // Reverse geocode the coordinates to get the address
           try {
@@ -117,6 +124,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     
     // Force update the parent component immediately with the new address
     onAddressChange(formattedAddress);
+    
+    // Notify parent component of the location coordinates if callback exists
+    if (onLocationSelect) {
+      onLocationSelect(lat, lng);
+    }
     
     // Update the address input field in case it's not binding correctly
     const addressInput = document.querySelector('input[placeholder="Enter your delivery address"]') as HTMLInputElement;

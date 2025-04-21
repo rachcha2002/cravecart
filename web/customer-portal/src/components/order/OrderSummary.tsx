@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LocationSelector from './LocationSelector';
 import { MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../contexts/AuthContext';
+import orderService from '../../services/orderService';
+import { toast } from 'react-hot-toast';
 
-// Dummy data
+// Fallback dummy data in case cart is empty
 const dummyOrder = {
   id: 'ORD-12345',
   restaurantName: 'Tasty Bites',
@@ -20,22 +24,108 @@ const dummyOrder = {
   deliveryTime: '30-45 min',
 };
 
+// Sample restaurant data (static for now)
+const sampleRestaurant = {
+  "restaurantInfo": {
+    "businessHours": {
+      "open": "10:00",
+      "close": "21:00"
+    },
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        79.8747612487793,
+        6.928292856723946
+      ]
+    },
+    "restaurantName": "Perera Indian Restaurant",
+    "description": "Perera Indian Restaurant offers authentic Indian cuisine in a warm, cozy setting with elegant decor and a welcoming vibe.",
+    "cuisine": [
+      "indian"
+    ],
+    "images": [
+      {
+        "url": "https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745080636/xfawdqq9rcke1kwr1fw2.png",
+        "description": "",
+        "isPrimary": true,
+        "_id": "6803d14c69261470e97ecc5c",
+        "uploadedAt": "2025-04-19T16:37:32.327Z"
+      }
+    ]
+  },
+  "deliveryInfo": {
+    "currentLocation": {
+      "type": "Point",
+      "coordinates": [
+        0,
+        0
+      ]
+    },
+    "documents": {
+      "driverLicense": {
+        "verified": false
+      },
+      "vehicleRegistration": {
+        "verified": false
+      },
+      "insurance": {
+        "verified": false
+      }
+    },
+    "availabilityStatus": "offline"
+  },
+  "_id": "6803d14c69261470e97ecc5b",
+  "name": "Janaka Perera",
+  "email": "jperera@gmail.com",
+  "phoneNumber": "0714804203",
+  "role": "restaurant",
+  "address": "213 Siri Dhamma Mawatha, Colombo 01000, Sri Lanka",
+  "isVerified": true,
+  "status": "active",
+  "defaultLocations": [],
+  "createdAt": "2025-04-19T16:37:32.328Z",
+  "updatedAt": "2025-04-19T16:37:32.328Z",
+  "__v": 0
+};
+
 const OrderSummary: React.FC = () => {
+  const navigate = useNavigate();
+  const { items, totalAmount, isEmpty, clearCart } = useCart();
+  const { user } = useAuth();
+  
+  // Calculate tax and delivery fee
+  const tax = totalAmount * 0.08; // 8% tax
+  const deliveryFee = 2.99;
+  const orderTotal = totalAmount + tax + deliveryFee;
+  
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [addressChanged, setAddressChanged] = useState(false);
   const [isValidatingAddress, setIsValidatingAddress] = useState(false);
   const [addressValidated, setAddressValidated] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+  const [locationCoordinates, setLocationCoordinates] = useState<{latitude: number, longitude: number} | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
+  // Generate a stable order ID that won't change on re-renders
+  const [orderId, setOrderId] = useState<string>('');
+  
+  // Generate the order ID once when component mounts
+  useEffect(() => {
+    setOrderId(`ORD-${Math.floor(10000 + Math.random() * 90000)}`);
+  }, []);
+  
   // Automatically try to get user's location on component mount
   useEffect(() => {
     if (useCurrentLocation && navigator.geolocation) {
       setIsValidatingAddress(true);
       navigator.geolocation.getCurrentPosition(
-        () => {
-          // Success - the LocationSelector will handle the actual geolocation
-          // We're just checking if geolocation is available here
+        (position) => {
+          // Store coordinates
+          setLocationCoordinates({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
           setIsValidatingAddress(false);
         },
         (error) => {
@@ -84,6 +174,83 @@ const OrderSummary: React.FC = () => {
     }, 500); // Reduced timeout for better UX
   };
 
+  const handleLocationSelect = (lat: number, lng: number) => {
+    setLocationCoordinates({
+      latitude: lat,
+      longitude: lng
+    });
+  };
+
+  const handleProceedToPayment = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Make sure we have coordinates
+      if (!locationCoordinates) {
+        toast.error("Please select a delivery location");
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Create order data for saving to order service
+      const orderData = {
+        orderId,
+        user: user || {
+          id: "guest-user",
+          name: localStorage.getItem('userName') || 'Guest User',
+          email: localStorage.getItem('userEmail') || 'guest@example.com',
+        },
+        restaurant: sampleRestaurant,
+        foods: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          // Include any other food item properties here
+        })),
+        subtotal: totalAmount,
+        tax,
+        deliveryFee,
+        total: orderTotal,
+        paymentStatus: 'pending',
+        paymentId: `PAY-${Math.floor(10000 + Math.random() * 90000)}`, // Payment ID will be updated after payment
+        paymentMethod: 'card', // Default payment method
+        deliveryAddress,
+        deliveryLocation: locationCoordinates,
+        estimatedDeliveryTime: new Date(Date.now() + 45 * 60 * 1000) // 45 minutes from now
+      };
+      
+      // Save the order to the order service
+      const createdOrder = await orderService.createOrder(orderData);
+      console.log('Order created:', createdOrder);
+      
+      // Create payment data
+      const paymentData = {
+        orderId,
+        amount: orderTotal,
+        currency: 'LKR',
+        customerEmail: user?.email || localStorage.getItem('userEmail') || 'customer@example.com',
+        customerName: user?.name || localStorage.getItem('userName') || 'Customer'
+      };
+
+      // Navigate to payment page with payment data
+      navigate('/payment', { state: { orderData: paymentData } });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Failed to create order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // If cart is empty, use dummy data
+  const displayItems = isEmpty ? dummyOrder.items : items;
+  const displaySubtotal = isEmpty ? dummyOrder.subtotal : totalAmount;
+  const displayTax = isEmpty ? dummyOrder.tax : tax;
+  const displayDeliveryFee = isEmpty ? dummyOrder.deliveryFee : deliveryFee;
+  const displayTotal = isEmpty ? dummyOrder.total : orderTotal;
+  const restaurantName = isEmpty ? dummyOrder.restaurantName : (items[0]?.restaurantId || 'Unknown Restaurant');
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 md:p-6 w-full min-h-screen md:min-h-0 md:max-w-5xl mx-auto">
       <h2 className="text-xl md:text-3xl font-bold mb-4 md:mb-6 dark:text-white">Order Summary</h2>
@@ -91,13 +258,13 @@ const OrderSummary: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg md:text-xl font-semibold mb-2 dark:text-white">Order #{dummyOrder.id}</h3>
-            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Restaurant: {dummyOrder.restaurantName}</p>
+            <h3 className="text-lg md:text-xl font-semibold mb-2 dark:text-white">Order #{orderId}</h3>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Restaurant: {restaurantName}</p>
           </div>
           
           <div className="border-t border-b border-gray-200 dark:border-gray-700 py-3 md:py-4">
             <h3 className="text-lg md:text-xl font-semibold mb-2 md:mb-3 dark:text-white">Items</h3>
-            {dummyOrder.items.map((item) => (
+            {displayItems.map((item) => (
               <div key={item.id} className="flex justify-between mb-3 text-base md:text-lg">
                 <div>
                   <span className="font-medium dark:text-white">{item.quantity}x </span>
@@ -111,26 +278,26 @@ const OrderSummary: React.FC = () => {
           <div>
             <div className="flex justify-between mb-2 text-base md:text-lg">
               <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-              <span className="dark:text-white">${dummyOrder.subtotal.toFixed(2)}</span>
+              <span className="dark:text-white">${displaySubtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between mb-2 text-base md:text-lg">
               <span className="text-gray-600 dark:text-gray-400">Tax</span>
-              <span className="dark:text-white">${dummyOrder.tax.toFixed(2)}</span>
+              <span className="dark:text-white">${displayTax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between mb-2 text-base md:text-lg">
               <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
-              <span className="dark:text-white">${dummyOrder.deliveryFee.toFixed(2)}</span>
+              <span className="dark:text-white">${displayDeliveryFee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg md:text-xl mt-2">
               <span className="dark:text-white">Total</span>
-              <span className="dark:text-white">${dummyOrder.total.toFixed(2)}</span>
+              <span className="dark:text-white">${displayTotal.toFixed(2)}</span>
             </div>
           </div>
           
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h3 className="text-lg md:text-xl font-semibold mb-3 dark:text-white">Delivery Info</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-1 text-base md:text-lg">Estimated Time: {dummyOrder.deliveryTime}</p>
-            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Payment Method: {dummyOrder.paymentMethod}</p>
+            <p className="text-gray-600 dark:text-gray-300 mb-1 text-base md:text-lg">Estimated Time: 30-45 min</p>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">Payment Method: Credit Card</p>
           </div>
         </div>
         
@@ -171,7 +338,8 @@ const OrderSummary: React.FC = () => {
               
               <LocationSelector 
                 initialAddress={deliveryAddress} 
-                onAddressChange={handleAddressChange} 
+                onAddressChange={handleAddressChange}
+                onLocationSelect={handleLocationSelect}
               />
             </div>
             
@@ -209,13 +377,22 @@ const OrderSummary: React.FC = () => {
           >
             Back to Home
           </Link>
-          <Link 
-            to="/payment"
-            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg ${!addressValidated ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600'}`}
-            onClick={(e) => !addressValidated && e.preventDefault()}
+          <button 
+            onClick={handleProceedToPayment}
+            disabled={!addressValidated || isProcessing}
+            className={`px-4 py-3 md:py-3 text-center text-white rounded w-full md:w-auto text-base md:text-lg flex justify-center items-center
+              ${(!addressValidated || isProcessing) ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-700'}`}
           >
-            {!addressValidated ? 'Please confirm your address' : 'Proceed to Payment'}
-          </Link>
+            {isProcessing ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : !addressValidated ? 'Please confirm your address' : 'Proceed to Payment'}
+          </button>
         </div>
       </div>
       
