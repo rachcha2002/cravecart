@@ -107,8 +107,13 @@ const OrderSummary: React.FC = () => {
   const [locationCoordinates, setLocationCoordinates] = useState<{latitude: number, longitude: number} | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Generate a random order ID
-  const orderId = `ORD-${Math.floor(10000 + Math.random() * 90000)}`;
+  // Generate a stable order ID that won't change on re-renders
+  const [orderId, setOrderId] = useState<string>('');
+  
+  // Generate the order ID once when component mounts
+  useEffect(() => {
+    setOrderId(`ORD-${Math.floor(10000 + Math.random() * 90000)}`);
+  }, []);
   
   // Automatically try to get user's location on component mount
   useEffect(() => {
