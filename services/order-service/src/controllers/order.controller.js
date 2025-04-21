@@ -25,6 +25,23 @@ exports.createOrder = async (req, res) => {
     // Save the order
     const savedOrder = await order.save();
     
+    // Get the io instance from req.app
+    const io = req.app.get('io');
+    
+    // If payment is completed, emit socket event to notify restaurant
+    if (savedOrder.paymentStatus === 'completed') {
+      const restaurantId = savedOrder.restaurant._id;
+      
+      // Emit to specific restaurant room
+      io.to(`restaurant-${restaurantId}`).emit('new-order', {
+        orderId: savedOrder.orderId,
+        orderData: savedOrder,
+        message: 'New order received!'
+      });
+      
+      console.log(`New order notification sent to restaurant ${restaurantId}`);
+    }
+    
     res.status(201).json({
       success: true,
       data: savedOrder
@@ -129,6 +146,18 @@ exports.updateOrderStatus = async (req, res) => {
     // Save the updated order
     const updatedOrder = await order.save();
     
+    // Get the io instance from req.app
+    const io = req.app.get('io');
+    
+    // Emit status update event to restaurant
+    const restaurantId = updatedOrder.restaurant._id;
+    io.to(`restaurant-${restaurantId}`).emit('order-status-update', {
+      orderId: updatedOrder.orderId,
+      status: updatedOrder.status,
+      orderData: updatedOrder,
+      message: `Order ${orderId} status updated to ${status}`
+    });
+    
     res.status(200).json({
       success: true,
       data: updatedOrder
@@ -165,6 +194,17 @@ exports.updatePaymentStatus = async (req, res) => {
         status: 'payment-completed',
         time: new Date(),
         description: 'Payment has been completed successfully'
+      });
+      
+      // Get the io instance from req.app
+      const io = req.app.get('io');
+      
+      // Emit new order event to restaurant when payment is completed
+      const restaurantId = order.restaurant._id;
+      io.to(`restaurant-${restaurantId}`).emit('new-order', {
+        orderId: order.orderId,
+        orderData: order,
+        message: 'New order received with completed payment!'
       });
     }
     

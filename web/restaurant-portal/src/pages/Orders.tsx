@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import { orderService } from "../services/orderService";
+import { playNotificationSound } from "../utils/SoundUtils";
 import { Order } from "../types/order.types";
 import OrderDetailsModal from "../components/OrderDetailsModal";
 import StatusUpdateDropdown from "../components/StatusUpdateDropdown";
 
 const Orders: React.FC = () => {
   const { user } = useAuth();
+  const { socket, notifications } = useNotifications();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,6 +17,8 @@ const Orders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [newOrderAlert, setNewOrderAlert] = useState<string | null>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
 
   const fetchOrders = async () => {
     if (!user || !user._id) return;
@@ -35,6 +40,91 @@ const Orders: React.FC = () => {
   useEffect(() => {
     fetchOrders();
   }, [user]);
+
+  // Track socket connection status
+  useEffect(() => {
+    if (!socket) return;
+    
+    setSocketConnected(socket.connected);
+    
+    const handleConnect = () => {
+      setSocketConnected(true);
+      // Refresh orders when socket reconnects
+      fetchOrders();
+    };
+    
+    const handleDisconnect = () => {
+      setSocketConnected(false);
+    };
+    
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+    };
+  }, [socket]);
+
+  // Listen for real-time order updates
+  useEffect(() => {
+    if (!socket) return;
+
+    // Handle new order notifications
+    const handleNewOrder = (data: any) => {
+      if (data.orderData && data.orderData.restaurant && data.orderData.restaurant._id === user?._id) {
+        // Add the new order to the state
+        setOrders(prev => [data.orderData, ...prev]);
+        
+        // Show alert and play sound
+        setNewOrderAlert(`New order received: #${data.orderId}`);
+        
+        // Clear the alert after 5 seconds
+        setTimeout(() => {
+          setNewOrderAlert(null);
+        }, 5000);
+        
+        // Play notification sound
+        playNotificationSound();
+      }
+    };
+
+    // Handle order status updates
+    const handleOrderStatusUpdate = (data: any) => {
+      if (data.orderData && data.orderData.restaurant && data.orderData.restaurant._id === user?._id) {
+        // Update the order in the state
+        setOrders(prev => 
+          prev.map(order => order.orderId === data.orderId ? data.orderData : order)
+        );
+        
+        // If the selected order in modal is being updated, update it too
+        if (selectedOrder && selectedOrder.orderId === data.orderId) {
+          setSelectedOrder(data.orderData);
+        }
+      }
+    };
+
+    socket.on('new-order', handleNewOrder);
+    socket.on('order-status-update', handleOrderStatusUpdate);
+
+    return () => {
+      socket.off('new-order', handleNewOrder);
+      socket.off('order-status-update', handleOrderStatusUpdate);
+    };
+  }, [socket, user, selectedOrder]);
+
+  // Check notifications for new orders
+  useEffect(() => {
+    // When a new notification arrives, refresh the orders
+    // This is a fallback in case socket event didn't update the state directly
+    const orderNotifications = notifications.filter(
+      n => n.type === 'new-order' || n.type === 'order-status-update'
+    );
+    
+    if (orderNotifications.length > 0) {
+      fetchOrders();
+    }
+  }, [notifications]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -143,6 +233,16 @@ const Orders: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* New Order Alert */}
+      {newOrderAlert && (
+        <div className="animate-pulse fixed top-5 right-5 bg-green-100 border border-green-500 text-green-700 px-4 py-3 rounded shadow-lg z-50 flex items-center">
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>{newOrderAlert}</span>
+        </div>
+      )}
+
       {/* Header with Stats */}
       <div className="bg-white p-6 rounded-xl shadow-sm">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center">
@@ -158,6 +258,14 @@ const Orders: React.FC = () => {
             </p>
           </div>
           <div className="mt-4 lg:mt-0 flex flex-wrap gap-3">
+            {!socketConnected && (
+              <div className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
+                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Offline Mode
+              </div>
+            )}
             <button
               type="button"
               onClick={handleRefresh}
@@ -198,10 +306,10 @@ const Orders: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Delivered</p>
-                <p className="text-2xl font-bold text-gray-900">{orders.filter(o => o.status === 'delivered').length}</p>
+                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status === 'delivered').length}</p>
               </div>
-              <div className="h-12 w-12 bg-green-200 rounded-full flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -211,13 +319,11 @@ const Orders: React.FC = () => {
           <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 font-medium">In Progress</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length}
-                </p>
+                <p className="text-sm text-gray-500 font-medium">Pending</p>
+                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status !== 'delivered' && order.status !== 'cancelled').length}</p>
               </div>
-              <div className="h-12 w-12 bg-yellow-200 rounded-full flex items-center justify-center">
-                <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-12 w-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -228,10 +334,10 @@ const Orders: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Cancelled</p>
-                <p className="text-2xl font-bold text-gray-900">{orders.filter(o => o.status === 'cancelled').length}</p>
+                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status === 'cancelled').length}</p>
               </div>
-              <div className="h-12 w-12 bg-red-200 rounded-full flex items-center justify-center">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
@@ -414,11 +520,13 @@ const Orders: React.FC = () => {
       )}
 
       {/* Order Details Modal */}
-      <OrderDetailsModal 
-        order={selectedOrder} 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal}
-      />
+      {isModalOpen && selectedOrder && (
+        <OrderDetailsModal 
+          order={selectedOrder} 
+          onClose={handleCloseModal} 
+          onUpdateStatus={handleUpdateStatus}
+        />
+      )}
     </div>
   );
 };

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Order } from '../types/order.types';
+import StatusUpdateDropdown from './StatusUpdateDropdown';
 
 interface OrderDetailsModalProps {
   order: Order | null;
-  isOpen: boolean;
   onClose: () => void;
+  onUpdateStatus?: (orderId: string, newStatus: string) => Promise<void>;
 }
 
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isOpen, onClose }) => {
+const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, onUpdateStatus }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
   
-  if (!isOpen || !order) return null;
+  if (!order) return null;
 
   const formatDatetime = (dateString: string | Date): string => {
     const date = new Date(dateString);
@@ -49,6 +50,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isOpen, on
 
   const formatCurrency = (amount: number): string => {
     return `₹${amount.toFixed(2)}`;
+  };
+
+  const handleStatusChange = (newStatus: string) => {
+    if (onUpdateStatus && order) {
+      onUpdateStatus(order.orderId, newStatus);
+    }
   };
 
   return (
@@ -100,10 +107,18 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isOpen, on
                   </p>
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-end">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadgeClasses(order.status)}`}>
                   {order.status.replace(/-/g, ' ')}
                 </span>
+                {onUpdateStatus && (
+                  <div className="mt-2">
+                    <StatusUpdateDropdown
+                      currentStatus={order.status}
+                      onStatusChange={handleStatusChange}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
