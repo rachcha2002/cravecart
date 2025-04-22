@@ -9,7 +9,12 @@ interface User {
   id: string;
   name: string;
   email: string;
-  phoneNumber?: string;
+  phoneNumber: string;
+  address: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AuthContextType {
@@ -30,6 +35,7 @@ interface AuthContextType {
   updateProfile: (userData: Partial<User>) => Promise<boolean>;
   refreshToken: () => Promise<boolean>;
   sessionTimeRemaining: number | null;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -219,6 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         updateProfile,
         refreshToken,
         sessionTimeRemaining,
+        setUser,
       }}
     >
       {children}
