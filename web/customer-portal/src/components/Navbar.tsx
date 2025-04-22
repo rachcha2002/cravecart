@@ -13,6 +13,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../hooks/useCart';
 import { toggleTheme } from '../features/theme/themeSlice';
 import CartModal from './CartModal';
+import NotificationBell from './notification/NotificationBell';
 
 const Navbar = () => {
   const dispatch = useDispatch();
@@ -82,6 +83,8 @@ const Navbar = () => {
                 <SunIcon className="h-6 w-6 text-gray-600 dark:text-gray-300 hidden dark:block" />
                 <MoonIcon className="h-6 w-6 text-gray-600 dark:text-gray-300 block dark:hidden" />
               </button>
+
+              {isAuthenticated && <NotificationBell />}
 
               <button
                 onClick={() => setIsCartOpen(true)}
@@ -168,4 +171,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

@@ -31,6 +31,29 @@ io.on('connection', (socket) => {
     socket.join(`restaurant-${restaurantId}`);
   });
   
+  // Join customer-specific room when customer connects
+  socket.on('join-customer', (customerId) => {
+    if (!customerId) return;
+    
+    console.log(`Customer ${customerId} joined`);
+    socket.join(`customer-${customerId}`);
+    
+    // Make sure to handle both id formats to support both portals
+    const idStr = String(customerId);
+    if (idStr.includes('_id') || idStr.includes('id')) {
+      // If the ID includes "id" text, it might be an object instead of just an ID string
+      try {
+        const idObj = JSON.parse(idStr);
+        const actualId = idObj._id || idObj.id;
+        if (actualId && actualId !== customerId) {
+          socket.join(`customer-${actualId}`);
+        }
+      } catch (err) {
+        // Not a JSON object, ignore
+      }
+    }
+  });
+  
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
