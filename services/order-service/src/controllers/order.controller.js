@@ -158,6 +158,22 @@ exports.updateOrderStatus = async (req, res) => {
       message: `Order ${orderId} status updated to ${status}`
     });
     
+    // Emit status update event to customer if the user data exists
+    if (updatedOrder.user) {
+      // Get customer ID, supporting both _id and id formats to work with both portals
+      const customerId = updatedOrder.user._id || updatedOrder.user.id;
+      
+      if (customerId) {
+        io.to(`customer-${customerId}`).emit('order-status-update', {
+          orderId: updatedOrder.orderId,
+          status: updatedOrder.status,
+          orderData: updatedOrder,
+          message: `Your order status has been updated to ${formatStatus(status)}`
+        });
+        console.log(`Order status update notification sent to customer ${customerId}`);
+      }
+    }
+    
     res.status(200).json({
       success: true,
       data: updatedOrder
@@ -168,6 +184,14 @@ exports.updateOrderStatus = async (req, res) => {
       message: error.message
     });
   }
+};
+
+// Helper function to format status for customer-friendly messages
+const formatStatus = (status) => {
+  return status
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 };
 
 // Update payment status
