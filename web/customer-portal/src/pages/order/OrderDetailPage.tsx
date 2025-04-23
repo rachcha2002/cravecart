@@ -181,23 +181,8 @@ const OrderDetailPage: React.FC = () => {
         console.log('Refreshing order details from SSE update');
         fetchOrderDetails(id);
         
-        // Add notification to the notification bell
-        if (data.type === 'status-update' && data.status) {
-          const statusMessage = `Order ${id} status updated to: ${formatStatus(data.status)}`;
-          
-          // Add to notification bell
-          addNotification({
-            type: 'order-status-update',
-            message: statusMessage,
-            orderId: id,
-            data: data.orderData
-          });
-          
-          // Show toast notification for status updates
-          toast.success(statusMessage, {
-            id: `order-update-${Date.now()}`
-          });
-        }
+        // We don't need to add notifications here anymore as it's handled by OrderUpdateListener
+        // Just update the local UI state
         
         // Update last updated timestamp
         setLastUpdated(new Date());
@@ -231,7 +216,7 @@ const OrderDetailPage: React.FC = () => {
         sseRef.current = null;
       }
     };
-  }, [id, fetchOrderDetails, addNotification]);
+  }, [id, fetchOrderDetails]);
   
   // Only set up socket and polling as fallbacks if SSE is not connected
   useEffect(() => {

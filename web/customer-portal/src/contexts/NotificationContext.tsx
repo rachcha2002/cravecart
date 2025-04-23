@@ -56,6 +56,39 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   // Simple polling state for fallback
   const [isPolling, setIsPolling] = useState(false);
 
+  // Add a new notification
+  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: new Date(),
+      read: false
+    };
+
+    setNotifications(prev => [newNotification, ...prev]);
+  };
+
+  // Mark a notification as read
+  const markAsRead = (id: string) => {
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id ? { ...notification, read: true } : notification
+      )
+    );
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = () => {
+    setNotifications(prev =>
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  };
+
+  // Clear all notifications
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
+
   // Initialize socket connection
   useEffect(() => {
     // Only create socket if user is logged in
@@ -103,7 +136,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       console.log('Unmounting, disconnecting socket');
       newSocket.disconnect();
     };
-  }, [user]); // Only recreate socket when user changes
+  }, [user?.id]); // Only recreate socket when user ID changes
 
   // Listen for order status updates
   useEffect(() => {
@@ -121,16 +154,68 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       if (orderUserId === currentUserId) {
         console.log('Order update is for current user');
         
-        // Add to notifications
+        // Format the status for display
+        const formattedStatus = data.status
+          .split('-')
+          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+
+        // Create a more descriptive message based on the status
+        let message = `Order #${orderId} `;
+        switch (data.status) {
+          case 'order-received':
+            message += 'has been received by the restaurant';
+            break;
+          case 'preparing-your-order':
+            message += 'is being prepared';
+            break;
+          case 'wrapping-up':
+            message += 'is being wrapped up';
+            break;
+          case 'picking-up':
+            message += 'is being picked up by the delivery partner';
+            break;
+          case 'heading-your-way':
+            message += 'is on its way to you';
+            break;
+          case 'delivered':
+            message += 'has been delivered';
+            break;
+          case 'cancelled':
+            message += 'has been cancelled';
+            break;
+          default:
+            message += `status updated to ${formattedStatus}`;
+        }
+        
+        // Add to notifications with enhanced data
         addNotification({
           type: 'order-status-update',
-          message: data.message || `Order ${orderId} status updated to ${data.status}`,
+          message,
           orderId,
-          data: data.orderData
+          data: {
+            ...data.orderData,
+            formattedStatus,
+            timestamp: new Date(),
+            restaurantName: data.orderData?.restaurant?.restaurantInfo?.restaurantName || 'Restaurant'
+          }
         });
         
-        // Show toast
-        toast.success(data.message || `Order status updated to ${data.status}`);
+        // Show toast with the same formatted message
+        toast.success(message, {
+          duration: 5000,
+          position: 'top-right'
+        });
+
+        // Dispatch an event for other components to listen to
+        window.dispatchEvent(new CustomEvent('orderStatusUpdate', { 
+          detail: { 
+            orderId,
+            status: data.status,
+            formattedStatus,
+            data: data.orderData
+          }
+        }));
       } else {
         console.log('Order update is NOT for current user', { orderUserId, currentUserId });
       }
@@ -143,7 +228,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     return () => {
       socket.off('order-status-update', handleOrderUpdate);
     };
-  }, [socket, user]);
+  }, [socket, user, addNotification]);
 
   // Simple manual reconnect function
   const reconnectSocket = () => {
@@ -179,39 +264,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       toast.error('Failed to reconnect', { id: 'reconnect-error' });
       toast.dismiss('reconnect-toast');
     });
-  };
-
-  // Add a new notification
-  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: Math.random().toString(36).substring(2, 9),
-      timestamp: new Date(),
-      read: false
-    };
-
-    setNotifications(prev => [newNotification, ...prev]);
-  };
-
-  // Mark a notification as read
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
-  };
-
-  // Mark all notifications as read
-  const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notification => ({ ...notification, read: true }))
-    );
-  };
-
-  // Clear all notifications
-  const clearNotifications = () => {
-    setNotifications([]);
   };
 
   return (
