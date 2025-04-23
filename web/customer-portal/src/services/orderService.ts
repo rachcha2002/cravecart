@@ -16,6 +16,49 @@ const handleApiError = (error: any, customMessage: string) => {
   throw error;
 };
 
+// Add a new method for real-time order updates using SSE
+const subscribeToOrderUpdates = (orderId: string, callback: (data: any) => void) => {
+  console.log(`Subscribing to order updates for: ${orderId}`);
+  
+  try {
+    // Create EventSource connection to the server
+    const eventSource = new EventSource(`${ORDER_API_URL}/${orderId}/updates`);
+    
+    // Handle connection open
+    eventSource.onopen = () => {
+      console.log(`SSE connection established for order ${orderId}`);
+    };
+    
+    // Handle incoming messages
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Received order update via SSE:', data);
+        callback(data);
+      } catch (error) {
+        console.error('Error parsing SSE data:', error);
+      }
+    };
+    
+    // Handle errors
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      // Try to reconnect after a delay
+      setTimeout(() => {
+        console.log('Attempting to reconnect SSE...');
+        eventSource.close();
+        subscribeToOrderUpdates(orderId, callback);
+      }, 5000);
+    };
+    
+    // Return the event source so it can be closed if needed
+    return eventSource;
+  } catch (error) {
+    console.error('Error setting up SSE connection:', error);
+    return null;
+  }
+};
+
 const orderService = {
   // Create a new order
   createOrder: async (orderData: any) => {
@@ -89,7 +132,9 @@ const orderService = {
     } catch (error) {
       return handleApiError(error, 'Error updating payment status');
     }
-  }
+  },
+
+  subscribeToOrderUpdates  // Add the new method to the exported object
 };
 
 export default orderService; 

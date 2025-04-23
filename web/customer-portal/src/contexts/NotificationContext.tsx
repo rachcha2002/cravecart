@@ -21,6 +21,8 @@ interface NotificationContextType {
   markAllAsRead: () => void;
   socket: Socket | null;
   clearNotifications: () => void;
+  socketConnected: boolean;
+  reconnectSocket: () => void;
 }
 
 interface NotificationProviderProps {
@@ -37,83 +39,146 @@ export const useNotifications = () => {
   return context;
 };
 
-// Get socket.io server URL from environment variable or use a default
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5003';
+// Set socket.io server URL - this must match your order service exactly
+const SOCKET_URL = 'http://localhost:5003/customer-updates'; // customer-specific namespace
 
 // Provider component
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const { user } = useAuth();
 
   // Calculate unread count
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // Simple polling state for fallback
+  const [isPolling, setIsPolling] = useState(false);
+
   // Initialize socket connection
   useEffect(() => {
-    if (!user || !user.id) return;
+    // Only create socket if user is logged in
+    if (!user || !user.id) {
+      console.log('No user logged in, skipping socket connection');
+      return;
+    }
 
-    const socketInstance = io(SOCKET_URL, {
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-    });
+    console.log('Creating socket connection to:', SOCKET_URL);
+
+    // Close any existing socket
+    if (socket) {
+      console.log('Closing existing socket');
+      socket.close();
+    }
+
+    // Create new socket with minimal options
+    const newSocket = io(SOCKET_URL);
+    console.log('Socket instance created');
     
-    setSocket(socketInstance);
+    setSocket(newSocket);
 
-    socketInstance.on('connect', () => {
-      console.log('Connected to socket server');
+    // Set up event handlers
+    newSocket.on('connect', () => {
+      console.log('Socket connected, ID:', newSocket.id);
+      setSocketConnected(true);
       
       // Join customer-specific room
-      if (user.id) {
-        socketInstance.emit('join-customer', user.id);
-        console.log('Joined customer room:', user.id);
-      }
-    });
-    
-    socketInstance.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-    });
-    
-    socketInstance.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`Socket reconnection attempt ${attemptNumber}`);
-    });
-    
-    socketInstance.on('reconnect_failed', () => {
-      console.error('Socket reconnection failed');
+      newSocket.emit('join-customer', user.id);
+      console.log('Sent join-customer event with ID:', user.id);
     });
 
-    // Cleanup on unmount
+    newSocket.on('disconnect', () => {
+      console.log('Socket disconnected');
+      setSocketConnected(false);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setSocketConnected(false);
+    });
+
+    // Clean up on unmount
     return () => {
-      socketInstance.disconnect();
+      console.log('Unmounting, disconnecting socket');
+      newSocket.disconnect();
     };
-  }, [user]);
+  }, [user]); // Only recreate socket when user changes
 
-  // Listen for order status update notifications
+  // Listen for order status updates
   useEffect(() => {
     if (!socket) return;
 
-    // Handle order status update notifications
-    socket.on('order-status-update', (data) => {
-      // Only add notification if the order is for this customer
-      if (data.orderData.user && data.orderData.user.id === user?.id) {
+    const handleOrderUpdate = (data: any) => {
+      console.log('Received order update:', data);
+      
+      // We need to check if this update is for the current user
+      const orderId = data.orderId;
+      const orderUserId = data.orderData?.user?.id;
+      const currentUserId = user?.id;
+      
+      // Only show notifications for this user's orders
+      if (orderUserId === currentUserId) {
+        console.log('Order update is for current user');
+        
+        // Add to notifications
         addNotification({
           type: 'order-status-update',
-          message: data.message || `Order ${data.orderId} status updated to ${data.status}`,
-          orderId: data.orderId,
+          message: data.message || `Order ${orderId} status updated to ${data.status}`,
+          orderId,
           data: data.orderData
         });
         
-        // Show toast notification
+        // Show toast
         toast.success(data.message || `Order status updated to ${data.status}`);
+      } else {
+        console.log('Order update is NOT for current user', { orderUserId, currentUserId });
       }
-    });
+    };
 
+    // Add event listener
+    socket.on('order-status-update', handleOrderUpdate);
+    
+    // Remove event listener on cleanup
     return () => {
-      socket.off('order-status-update');
+      socket.off('order-status-update', handleOrderUpdate);
     };
   }, [socket, user]);
+
+  // Simple manual reconnect function
+  const reconnectSocket = () => {
+    if (!user || !user.id) return;
+    
+    console.log('Manually reconnecting socket');
+    
+    if (socket) {
+      socket.disconnect();
+    }
+    
+    // Show reconnecting toast
+    toast.loading('Reconnecting to server...', { id: 'reconnect-toast' });
+    
+    // Create new socket
+    const newSocket = io(SOCKET_URL);
+    setSocket(newSocket);
+    
+    // Handle connection events
+    newSocket.on('connect', () => {
+      console.log('Socket reconnected');
+      setSocketConnected(true);
+      toast.success('Successfully reconnected!', { id: 'reconnect-success' });
+      toast.dismiss('reconnect-toast');
+      
+      // Join customer-specific room
+      newSocket.emit('join-customer', user.id);
+    });
+    
+    newSocket.on('connect_error', (error) => {
+      console.error('Reconnection error:', error);
+      setSocketConnected(false);
+      toast.error('Failed to reconnect', { id: 'reconnect-error' });
+      toast.dismiss('reconnect-toast');
+    });
+  };
 
   // Add a new notification
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
@@ -155,7 +220,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       markAsRead,
       markAllAsRead,
       socket,
-      clearNotifications
+      clearNotifications,
+      socketConnected,
+      reconnectSocket
     }}>
       {children}
     </NotificationContext.Provider>

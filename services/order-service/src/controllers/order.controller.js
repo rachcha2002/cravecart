@@ -118,6 +118,89 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
+// Get real-time order updates
+exports.getOrderUpdates = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    // Find the order
+    const order = await Order.findOne({ orderId });
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    // Set headers for Server-Sent Events
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    // Send initial order data
+    res.write(`data: ${JSON.stringify({
+      type: 'initial',
+      orderId: order.orderId,
+      status: order.status,
+      orderData: order,
+      timestamp: new Date().toISOString()
+    })}\n\n`);
+    
+    // Create a unique client ID
+    const clientId = Date.now();
+    
+    // Store the client's response object
+    const clients = req.app.get('sse-clients') || {};
+    if (!clients[orderId]) {
+      clients[orderId] = {};
+    }
+    clients[orderId][clientId] = res;
+    req.app.set('sse-clients', clients);
+    
+    console.log(`Client ${clientId} subscribed to updates for order ${orderId}`);
+    
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log(`Client ${clientId} disconnected from order ${orderId} updates`);
+      if (clients[orderId]) {
+        delete clients[orderId][clientId];
+        
+        // Clean up empty order entries
+        if (Object.keys(clients[orderId]).length === 0) {
+          delete clients[orderId];
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error in order updates stream:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while setting up order updates stream'
+    });
+  }
+};
+
+// Helper function to send update to all connected clients for a specific order
+const sendOrderUpdate = (req, orderId, data) => {
+  const clients = req.app.get('sse-clients') || {};
+  if (!clients[orderId]) return;
+  
+  console.log(`Sending update to ${Object.keys(clients[orderId]).length} clients for order ${orderId}`);
+  
+  // Add timestamp to the data
+  const updateData = {
+    ...data,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Send to all connected clients for this order
+  Object.values(clients[orderId]).forEach(client => {
+    client.write(`data: ${JSON.stringify(updateData)}\n\n`);
+  });
+};
+
 // Update order status
 exports.updateOrderStatus = async (req, res) => {
   try {
@@ -149,6 +232,9 @@ exports.updateOrderStatus = async (req, res) => {
     // Get the io instance from req.app
     const io = req.app.get('io');
     
+    // Get the customer namespace
+    const customerIo = req.app.get('customerIo');
+    
     // Emit status update event to restaurant
     const restaurantId = updatedOrder.restaurant._id;
     io.to(`restaurant-${restaurantId}`).emit('order-status-update', {
@@ -158,20 +244,78 @@ exports.updateOrderStatus = async (req, res) => {
       message: `Order ${orderId} status updated to ${status}`
     });
     
+    // Send update to all connected SSE clients for this order
+    sendOrderUpdate(req, orderId, {
+      type: 'status-update',
+      orderId: updatedOrder.orderId,
+      status: updatedOrder.status,
+      orderData: updatedOrder,
+      message: `Your order status has been updated to ${formatStatus(status)}`
+    });
+    
     // Emit status update event to customer if the user data exists
     if (updatedOrder.user) {
       // Get customer ID, supporting both _id and id formats to work with both portals
       const customerId = updatedOrder.user._id || updatedOrder.user.id;
       
       if (customerId) {
+        // Emit to customer-specific room in both namespaces
         io.to(`customer-${customerId}`).emit('order-status-update', {
           orderId: updatedOrder.orderId,
           status: updatedOrder.status,
           orderData: updatedOrder,
           message: `Your order status has been updated to ${formatStatus(status)}`
         });
-        console.log(`Order status update notification sent to customer ${customerId}`);
+        console.log(`Order status update notification sent to customer ${customerId} in main namespace`);
+        
+        // Also emit to customer namespace
+        if (customerIo) {
+          customerIo.to(`customer-${customerId}`).emit('order-status-update', {
+            orderId: updatedOrder.orderId,
+            status: updatedOrder.status,
+            orderData: updatedOrder,
+            message: `Your order status has been updated to ${formatStatus(status)}`
+          });
+          console.log(`Order status update notification sent to customer ${customerId} in customer namespace`);
+        }
+        
+        // Also emit to order-specific room as a fallback in both namespaces
+        io.to(`order-${updatedOrder.orderId}`).emit('order-status-update', {
+          orderId: updatedOrder.orderId,
+          status: updatedOrder.status,
+          orderData: updatedOrder,
+          message: `Your order status has been updated to ${formatStatus(status)}`
+        });
+        
+        if (customerIo) {
+          customerIo.to(`order-${updatedOrder.orderId}`).emit('order-status-update', {
+            orderId: updatedOrder.orderId,
+            status: updatedOrder.status,
+            orderData: updatedOrder,
+            message: `Your order status has been updated to ${formatStatus(status)}`
+          });
+          console.log(`Order status update notification sent to order room ${updatedOrder.orderId} in customer namespace`);
+        }
       }
+    } else {
+      // If we don't have user data, just emit to the order-specific room in both namespaces
+      io.to(`order-${updatedOrder.orderId}`).emit('order-status-update', {
+        orderId: updatedOrder.orderId,
+        status: updatedOrder.status,
+        orderData: updatedOrder,
+        message: `Order status has been updated to ${formatStatus(status)}`
+      });
+      
+      if (customerIo) {
+        customerIo.to(`order-${updatedOrder.orderId}`).emit('order-status-update', {
+          orderId: updatedOrder.orderId,
+          status: updatedOrder.status,
+          orderData: updatedOrder,
+          message: `Order status has been updated to ${formatStatus(status)}`
+        });
+      }
+      
+      console.log(`Order status update notification sent to order room ${updatedOrder.orderId} (no user data)`);
     }
     
     res.status(200).json({
