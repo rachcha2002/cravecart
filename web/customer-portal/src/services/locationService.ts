@@ -4,7 +4,7 @@ import { DefaultLocation, DefaultLocationService } from "../types/locations";
 
 class ApiLocationService implements DefaultLocationService {
   private api = axios.create({
-    baseURL: process.env.REACT_APP_API_URL || "",
+    baseURL: process.env.REACT_APP_API_URL || "http://localhost:3001",
     headers: {
       "Content-Type": "application/json",
     },
@@ -26,7 +26,7 @@ class ApiLocationService implements DefaultLocationService {
    */
   async getLocations(userId: string): Promise<DefaultLocation[]> {
     try {
-      const response = await this.api.get("/users/me");
+      const response = await this.api.get("/api/auth/me");
 
       // Extract locations from user profile
       const locations = response.data.user.defaultLocations || [];

@@ -6,12 +6,19 @@ import locationService from "../services/locationService";
 import toast from "react-hot-toast";
 
 export const useLocations = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [locations, setLocations] = useState<DefaultLocation[]>([]);
   const [defaultLocation, setDefaultLocation] =
     useState<DefaultLocation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Set auth token whenever it changes
+  useEffect(() => {
+    if (token) {
+      locationService.setAuthToken(token);
+    }
+  }, [token]);
 
   // Fetch locations whenever user changes
   useEffect(() => {
