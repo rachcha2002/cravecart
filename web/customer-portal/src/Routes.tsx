@@ -18,6 +18,7 @@ import CartPage from './pages/order/CartPage';
 import PaymentSummaryPage from './pages/payment/PaymentSummaryPage';
 import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
 import PaymentFailedPage from './pages/payment/PaymentFailedPage';
+import RestaurantPage from './pages/RestaurantPage';
 
 const Routes: React.FC = () => {
   return (
@@ -28,6 +29,7 @@ const Routes: React.FC = () => {
         <Route path="contact" element={<ContactUs />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path='restaurants' element={<RestaurantPage/>}/>
         <Route
           path="profile"
           element={
