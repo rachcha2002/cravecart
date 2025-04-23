@@ -42,13 +42,7 @@ const userSchema = new mongoose.Schema(
     defaultLocations: [
       {
         name: String,
-        address: {
-          street: String,
-          city: String,
-          state: String,
-          postalCode: String,
-          country: String,
-        },
+        address: String,
         location: {
           type: { type: String, enum: ["Point"], default: "Point" },
           coordinates: { type: [Number], default: [0, 0] },

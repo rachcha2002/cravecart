@@ -1,7 +1,7 @@
-import { Fragment, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { Menu, Transition } from '@headlessui/react';
+import { Fragment, useState } from "react";
+import { Link } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { Menu, Transition } from "@headlessui/react";
 import {
   ShoppingCartIcon,
   MagnifyingGlassIcon,
@@ -28,7 +28,10 @@ const Navbar = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <Link to="/" className="text-2xl font-bold text-primary dark:text-white">
+                <Link
+                  to="/"
+                  className="text-2xl font-bold text-primary dark:text-white"
+                >
                   FoodDelivery
                 </Link>
               </div>
@@ -61,7 +64,7 @@ const Navbar = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex-1 max-w-lg mx-8">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -119,7 +122,7 @@ const Navbar = () => {
                           <Link
                             to="/profile"
                             className={`${
-                              active ? 'bg-gray-100 dark:bg-gray-600' : ''
+                              active ? "bg-gray-100 dark:bg-gray-600" : ""
                             } block px-4 py-2 text-sm text-gray-700 dark:text-gray-200`}
                           >
                             Profile
@@ -131,7 +134,7 @@ const Navbar = () => {
                           <Link
                             to="/orders"
                             className={`${
-                              active ? 'bg-gray-100 dark:bg-gray-600' : ''
+                              active ? "bg-gray-100 dark:bg-gray-600" : ""
                             } block px-4 py-2 text-sm text-gray-700 dark:text-gray-200`}
                           >
                             Orders
@@ -143,7 +146,7 @@ const Navbar = () => {
                           <button
                             onClick={logout}
                             className={`${
-                              active ? 'bg-gray-100 dark:bg-gray-600' : ''
+                              active ? "bg-gray-100 dark:bg-gray-600" : ""
                             } block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200`}
                           >
                             Sign out
@@ -170,5 +173,6 @@ const Navbar = () => {
     </>
   );
 };
+
 
 export default Navbar;

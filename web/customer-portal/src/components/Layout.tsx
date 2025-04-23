@@ -22,12 +22,12 @@ const Layout: React.FC = () => {
       { label: "About", path: "/about" },
       { label: "Contact", path: "/contact" },
     ];
-    
+
     // Add "My Orders" only for authenticated users
     if (user) {
       items.push({ label: "My Orders", path: "/orders" });
     }
-    
+
     return items;
   }, [user]);
 
