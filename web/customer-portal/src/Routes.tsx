@@ -62,11 +62,7 @@ const Routes: React.FC = () => {
           />
           <Route
             path=":id"
-            element={
-              <ProtectedRoute>
-                <OrderDetailPage />
-              </ProtectedRoute>
-            }
+            element={<OrderDetailPage />}
           />
         </Route>
         <Route path="order">
