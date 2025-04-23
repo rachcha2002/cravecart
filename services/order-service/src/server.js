@@ -15,13 +15,57 @@ const io = new Server(server, {
   cors: {
     origin: '*', // In production, restrict this to your frontend URLs
     methods: ['GET', 'POST']
-  }
+  },
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  connectTimeout: 10000
 });
 
 // Make io accessible across the application
 app.set('io', io);
 
-// Socket.IO connection handler
+// Initialize SSE clients storage
+app.set('sse-clients', {});
+
+// Create a dedicated namespace for customer order updates
+const customerNamespace = io.of('/customer-updates');
+
+// Customer namespace connection handler
+customerNamespace.on('connection', (socket) => {
+  console.log('Customer connected to dedicated namespace:', socket.id);
+  
+  // Join customer-specific room
+  socket.on('join-customer', (customerId) => {
+    if (!customerId) return;
+    
+    console.log(`Customer ${customerId} joined dedicated namespace`);
+    socket.join(`customer-${customerId}`);
+  });
+  
+  // Join order-specific room
+  socket.on('join-order', (orderId) => {
+    if (!orderId) return;
+    
+    console.log(`Customer joining order room in dedicated namespace: ${orderId}`);
+    socket.join(`order-${orderId}`);
+    
+    // Send confirmation
+    socket.emit('joined-order', {
+      orderId,
+      success: true,
+      message: `Successfully joined order room ${orderId} in customer namespace`
+    });
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.log(`Customer disconnected from dedicated namespace (${reason}):`, socket.id);
+  });
+});
+
+// Make customer namespace accessible across the application
+app.set('customerIo', customerNamespace);
+
+// Main socket.IO connection handler (for backward compatibility with restaurant portal)
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
   
@@ -33,9 +77,12 @@ io.on('connection', (socket) => {
   
   // Join customer-specific room when customer connects
   socket.on('join-customer', (customerId) => {
-    if (!customerId) return;
+    if (!customerId) {
+      console.log('Empty customer ID provided, cannot join room');
+      return;
+    }
     
-    console.log(`Customer ${customerId} joined`);
+    console.log(`Customer ${customerId} is joining room`);
     socket.join(`customer-${customerId}`);
     
     // Make sure to handle both id formats to support both portals
@@ -46,16 +93,44 @@ io.on('connection', (socket) => {
         const idObj = JSON.parse(idStr);
         const actualId = idObj._id || idObj.id;
         if (actualId && actualId !== customerId) {
+          console.log(`Customer also joining with parsed ID: ${actualId}`);
           socket.join(`customer-${actualId}`);
         }
       } catch (err) {
         // Not a JSON object, ignore
+        console.log('Not a parsable JSON object ID, using as-is');
       }
     }
+    
+    // Confirm room was joined by listing all rooms for this socket
+    const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+    console.log(`Customer socket ${socket.id} is now in rooms:`, rooms);
   });
   
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+  // Join order-specific room
+  socket.on('join-order', (orderId) => {
+    if (!orderId) {
+      console.log('Empty order ID provided, cannot join room');
+      return;
+    }
+    
+    console.log(`Joining order room: ${orderId}`);
+    socket.join(`order-${orderId}`);
+    
+    // Confirm room was joined by listing all rooms for this socket
+    const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+    console.log(`Order socket ${socket.id} is now in rooms:`, rooms);
+    
+    // Send a confirmation back to the client
+    socket.emit('joined-order', { 
+      orderId, 
+      success: true, 
+      message: `Successfully joined order room for ${orderId}` 
+    });
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.log(`Client disconnected (${reason}):`, socket.id);
   });
 });
 
@@ -76,9 +151,9 @@ const orderRoutes = require('./routes/order.routes');
 app.use('/api/orders', orderRoutes);
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5003;
 server.listen(PORT, () => {
-  console.log(`${process.env.SERVICE_NAME || 'Service'} running on port ${PORT}`);
+  console.log(`Order service running on port ${PORT}`);
 });
 
 // Connect to MongoDB

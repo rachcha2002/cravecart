@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -8,11 +8,14 @@ import {
   ClockIcon, 
   TruckIcon, 
   ChatBubbleLeftIcon, 
-  CreditCardIcon
+  CreditCardIcon,
+  ArrowPathIcon,
+  SignalIcon
 } from '@heroicons/react/24/outline';
 import orderService from '../../services/orderService';
 import { toast } from 'react-hot-toast';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface OrderItem {
   name: string;
@@ -56,60 +59,29 @@ interface OrderDetails {
 const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, token } = useAuth();
   const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { socket, notifications } = useNotifications();
-  const [socketConnected, setSocketConnected] = useState<boolean>(false);
+  const { socket, socketConnected, reconnectSocket } = useNotifications();
+  const [isPolling, setIsPolling] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [sseConnected, setSseConnected] = useState<boolean>(false);
+  const sseRef = useRef<EventSource | null>(null);
   
-  useEffect(() => {
-    if (!socket) return;
-    
-    setSocketConnected(socket.connected);
-    
-    const handleConnect = () => {
-      setSocketConnected(true);
-    };
-    
-    const handleDisconnect = () => {
-      setSocketConnected(false);
-    };
-    
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-    };
-  }, [socket]);
-  
-  useEffect(() => {
-    if (!socket || !id) return;
-    
-    const handleOrderStatusUpdate = (data: any) => {
-      if (data.orderId === id) {
-        fetchOrderDetails(id);
-      }
-    };
-    
-    socket.on('order-status-update', handleOrderStatusUpdate);
-    
-    return () => {
-      socket.off('order-status-update', handleOrderStatusUpdate);
-    };
-  }, [socket, id]);
-  
-  const fetchOrderDetails = async (orderId: string) => {
+  // Function to fetch order details
+  const fetchOrderDetails = useCallback(async (orderId: string) => {
     if (!orderId) {
       setError('Order ID is missing');
       setLoading(false);
       return;
     }
 
+    // Remove authentication check to allow public access
     try {
       setLoading(true);
+      console.log('Fetching order details for:', orderId);
       const response = await orderService.getOrder(orderId);
       
       if (response.success && response.data) {
@@ -142,32 +114,158 @@ const OrderDetailPage: React.FC = () => {
             rating: orderData.driver.rating || 0,
             vehicleInfo: orderData.driver.vehicleInfo || 'Not available'
           } : undefined,
-          deliveryTimeline: orderData.deliveryTimeline.map((item: any) => ({
+          deliveryTimeline: orderData.deliveryTimeline?.map((item: any) => ({
             status: formatStatus(item.status),
             time: new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             description: item.description
-          })),
+          })) || [],
           createdAt: orderData.createdAt
         };
         
         setOrderDetails(formattedOrder);
+        setLastUpdated(new Date());
+        setError(null);
+        
+        // Store order details in sessionStorage to persist through refresh
+        sessionStorage.setItem(`order-${orderId}`, JSON.stringify(formattedOrder));
       } else {
-        setError('Failed to fetch order details');
-        toast.error('Failed to load order details');
+        console.error('Failed to fetch order details:', response);
+        setError('Unable to load order details. Please try again.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching order details:', err);
-      setError('Error loading order details');
-      toast.error('Error loading order details');
+      setError(err.message || 'Failed to load order details');
+      
+      // Try to retrieve from sessionStorage if available
+      const storedOrder = sessionStorage.getItem(`order-${orderId}`);
+      if (storedOrder) {
+        try {
+          setOrderDetails(JSON.parse(storedOrder));
+          setError(null);
+          toast('Showing cached order details');
+        } catch (e) {
+          console.error('Error parsing stored order:', e);
+        }
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
 
+  // Manually refresh order details
+  const refreshOrder = useCallback(() => {
+    if (id) {
+      fetchOrderDetails(id);
+    }
+  }, [id, fetchOrderDetails]);
+
+  // Set up direct SSE connection for real-time order updates
   useEffect(() => {
-    fetchOrderDetails(id || '');
+    if (!id) return;
+    
+    console.log('Setting up direct SSE connection for order updates');
+    
+    // Clean up any existing SSE connection
+    if (sseRef.current) {
+      console.log('Closing existing SSE connection');
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+    
+    // Subscribe to order updates
+    const eventSource = orderService.subscribeToOrderUpdates(id, (data) => {
+      console.log('Received real-time order update via SSE:', data);
+      
+      // Update the order details
+      if (data.orderData) {
+        console.log('Refreshing order details from SSE update');
+        fetchOrderDetails(id);
+        
+        // Show toast notification for status updates
+        if (data.type === 'status-update' && data.status) {
+          toast.success(`Order status updated to: ${formatStatus(data.status)}`, {
+            id: `order-update-${Date.now()}`
+          });
+        }
+        
+        // Update last updated timestamp
+        setLastUpdated(new Date());
+        
+        // Mark that we have an active SSE connection
+        setSseConnected(true);
+      }
+    });
+    
+    // Store the event source for cleanup
+    if (eventSource) {
+      sseRef.current = eventSource;
+      
+      // Set up event handlers
+      eventSource.onopen = () => {
+        console.log('SSE connection established');
+        setSseConnected(true);
+      };
+      
+      eventSource.onerror = () => {
+        console.log('SSE connection error');
+        setSseConnected(false);
+      };
+    }
+    
+    // Clean up on unmount
+    return () => {
+      if (sseRef.current) {
+        console.log('Cleaning up SSE connection');
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+    };
   }, [id]);
-
+  
+  // Only set up socket and polling as fallbacks if SSE is not connected
+  useEffect(() => {
+    let pollingInterval: NodeJS.Timeout | null = null;
+    
+    // Only start polling if both SSE and socket are disconnected
+    if (!sseConnected && !socketConnected && id) {
+      console.log('Both SSE and socket disconnected, starting polling as last resort');
+      
+      // Poll every 15 seconds
+      pollingInterval = setInterval(() => {
+        console.log('Polling for order updates (last resort)');
+        fetchOrderDetails(id);
+      }, 15000);
+    }
+    
+    // Clean up interval on unmount or when either connection reconnects
+    return () => {
+      if (pollingInterval) {
+        console.log('Stopping polling');
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [sseConnected, socketConnected, id, fetchOrderDetails]);
+  
+  // Initial order fetch
+  useEffect(() => {
+    if (id) {
+      // Try to load from sessionStorage first for immediate display
+      const storedOrder = sessionStorage.getItem(`order-${id}`);
+      if (storedOrder) {
+        try {
+          setOrderDetails(JSON.parse(storedOrder));
+          setLoading(false);
+        } catch (e) {
+          console.error('Error parsing stored order:', e);
+        }
+      }
+      
+      // Always fetch fresh data regardless of authentication
+      console.log('Initial order fetch, then setting up real-time updates');
+      fetchOrderDetails(id);
+    }
+  }, [id, fetchOrderDetails]);
+  
   const formatStatus = (status: string): string => {
     return status
       .split('-')
@@ -180,12 +278,15 @@ const OrderDetailPage: React.FC = () => {
       case 'order received':
         return 'bg-blue-100 text-blue-800';
       case 'preparing your order':
+      case 'preparing':
         return 'bg-yellow-100 text-yellow-800';
       case 'wrapping up':
+      case 'ready-for-pickup':
         return 'bg-indigo-100 text-indigo-800';
       case 'picking up':
         return 'bg-purple-100 text-purple-800';
       case 'heading your way':
+      case 'out-for-delivery':
         return 'bg-orange-100 text-orange-800';
       case 'delivered':
         return 'bg-green-100 text-green-800';
@@ -217,16 +318,51 @@ const OrderDetailPage: React.FC = () => {
     return colors[index];
   };
 
-  const StatusIndicator = () => (
-    <div className="mb-4 flex items-center">
-      <div className={`w-3 h-3 rounded-full mr-2 ${socketConnected ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-      <span className="text-xs text-gray-500 dark:text-gray-400">
-        {socketConnected ? 'Live updates active' : 'Offline mode'}
-      </span>
+  // Connection status indicator with SSE support
+  const ConnectionStatusIndicator = () => (
+    <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-4">
+      <div className="flex items-center">
+        <div className="relative w-3 h-3 rounded-full mr-2 bg-gray-300">
+          <div className={`absolute inset-0 rounded-full ${sseConnected ? 'bg-green-500' : socketConnected ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+          {(sseConnected || socketConnected) && (
+            <span className="animate-ping absolute inset-0 rounded-full bg-green-400 opacity-75"></span>
+          )}
+        </div>
+        <div>
+          <p className="text-sm font-medium dark:text-white">
+            {sseConnected 
+              ? 'Direct Updates Active' 
+              : socketConnected 
+                ? 'Socket Updates Active' 
+                : 'Updates Offline'}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        {!sseConnected && !socketConnected && (
+          <button 
+            onClick={refreshOrder}
+            className="flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+          >
+            <SignalIcon className="w-3 h-3 mr-1" />
+            Reconnect
+          </button>
+        )}
+        <button 
+          onClick={refreshOrder}
+          className="flex items-center px-3 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+        >
+          <ArrowPathIcon className="w-3 h-3 mr-1" />
+          Refresh Now
+        </button>
+      </div>
     </div>
   );
 
-  if (loading) {
+  if (loading && !orderDetails) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="flex flex-col items-center justify-center h-64">
@@ -237,14 +373,14 @@ const OrderDetailPage: React.FC = () => {
     );
   }
 
-  if (error || !orderDetails) {
+  if (error && !orderDetails) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg text-center">
           <p className="text-red-600 dark:text-red-400 mb-4">{error || 'Failed to load order details'}</p>
           <div className="flex justify-center space-x-4">
             <button 
-              onClick={() => window.location.reload()}
+              onClick={() => fetchOrderDetails(id || '')}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Try Again
@@ -261,6 +397,10 @@ const OrderDetailPage: React.FC = () => {
     );
   }
 
+  if (!orderDetails) {
+    return null;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -275,6 +415,9 @@ const OrderDetailPage: React.FC = () => {
             <span>Back to Orders</span>
           </Link>
         </div>
+
+        {/* Connection Status Indicator */}
+        <ConnectionStatusIndicator />
 
         {/* Order Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
@@ -293,7 +436,6 @@ const OrderDetailPage: React.FC = () => {
                 </div>
               </div>
               <p className="text-gray-600 dark:text-gray-400 mt-2">Order #{orderDetails.orderId}</p>
-              <StatusIndicator />
             </div>
           </div>
         </div>
@@ -445,34 +587,41 @@ const OrderDetailPage: React.FC = () => {
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="relative">
-              {orderDetails.deliveryTimeline.map((item, index) => (
-                <div key={index} className="mb-8 flex last:mb-0">
-                  <div className="flex flex-col items-center mr-4">
-                    <div className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                      index === orderDetails.deliveryTimeline.length - 1
-                        ? 'bg-green-500 text-white'
-                        : 'bg-blue-100 text-blue-500'
+              {orderDetails.deliveryTimeline && orderDetails.deliveryTimeline.length > 0 ? (
+                orderDetails.deliveryTimeline.map((item, index) => (
+                  <div key={index} className="mb-8 flex last:mb-0">
+                    <div className="flex flex-col items-center mr-4">
+                      <div className={`rounded-full h-8 w-8 flex items-center justify-center ${
+                        index === orderDetails.deliveryTimeline.length - 1
+                          ? 'bg-green-500 text-white'
+                          : 'bg-blue-100 text-blue-500'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      {index < orderDetails.deliveryTimeline.length - 1 && (
+                        <div className="h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                      )}
+                    </div>
+                    <div className={`bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-sm flex-1 ${
+                      index === orderDetails.deliveryTimeline.length - 1 ? 'border-l-4 border-green-500' : ''
                     }`}>
-                      {index + 1}
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium dark:text-white">{item.status}</h4>
+                        <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                          <ClockIcon className="h-4 w-4 mr-1" />
+                          {item.time}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-300">{item.description}</p>
                     </div>
-                    {index < orderDetails.deliveryTimeline.length - 1 && (
-                      <div className="h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-                    )}
                   </div>
-                  <div className={`bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-sm flex-1 ${
-                    index === orderDetails.deliveryTimeline.length - 1 ? 'border-l-4 border-green-500' : ''
-                  }`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium dark:text-white">{item.status}</h4>
-                      <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
-                        <ClockIcon className="h-4 w-4 mr-1" />
-                        {item.time}
-                      </span>
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-300">{item.description}</p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">No delivery timeline available yet.</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Timeline will be updated as your order progresses.</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
