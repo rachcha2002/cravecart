@@ -2,6 +2,47 @@ import axios from 'axios';
 
 const ORDER_API_URL = process.env.REACT_APP_ORDER_API_URL || 'http://localhost:5003/api/orders';
 
+// Create an axios instance with a request interceptor for authorization
+const orderApi = axios.create({
+  baseURL: ORDER_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add request interceptor to include auth token in all requests
+orderApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Add response interceptor to handle authentication errors
+orderApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // For all error responses except getOrder requests, handle 401
+    if (error.response && error.response.status === 401) {
+      const url = error.config.url;
+      
+      // Check if this is a getOrder request (url will be like /{orderId})
+      const isGetOrder = url && /^\/[^\/]+$/.test(url);
+      
+      // Only redirect to login for non-getOrder requests
+      if (!isGetOrder) {
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Helper for better error handling
 const handleApiError = (error: any, customMessage: string) => {
   if (error.response && error.response.data) {
@@ -21,8 +62,15 @@ const subscribeToOrderUpdates = (orderId: string, callback: (data: any) => void)
   console.log(`Subscribing to order updates for: ${orderId}`);
   
   try {
-    // Create EventSource connection to the server
-    const eventSource = new EventSource(`${ORDER_API_URL}/${orderId}/updates`);
+    // Get authentication token
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('Cannot subscribe to updates: Authentication required');
+      return null;
+    }
+    
+    // Create EventSource connection to the server with authentication
+    const eventSource = new EventSource(`${ORDER_API_URL}/${orderId}/updates?token=${token}`);
     
     // Handle connection open
     eventSource.onopen = () => {
@@ -64,7 +112,7 @@ const orderService = {
   createOrder: async (orderData: any) => {
     try {
       console.log('Creating order with data:', orderData);
-      const response = await axios.post(ORDER_API_URL, orderData);
+      const response = await orderApi.post('', orderData);
       console.log('Order created successfully:', response.data);
       return response.data;
     } catch (error) {
@@ -75,6 +123,7 @@ const orderService = {
   // Get order by ID
   getOrder: async (orderId: string) => {
     try {
+      // Create a separate request without authentication headers for public access
       const response = await axios.get(`${ORDER_API_URL}/${orderId}`);
       return response.data;
     } catch (error) {
@@ -100,11 +149,7 @@ const orderService = {
         throw new Error('User ID not found in token');
       }
       
-      const response = await axios.get(`${ORDER_API_URL}/user/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await orderApi.get(`/user/${userId}`);
       
       return response.data;
     } catch (error) {
@@ -115,7 +160,7 @@ const orderService = {
   // Update order status
   updateOrderStatus: async (orderId: string, status: string) => {
     try {
-      const response = await axios.patch(`${ORDER_API_URL}/${orderId}/status`, { status });
+      const response = await orderApi.patch(`/${orderId}/status`, { status });
       return response.data;
     } catch (error) {
       return handleApiError(error, 'Error updating order status');
@@ -126,7 +171,7 @@ const orderService = {
   updatePaymentStatus: async (orderId: string, paymentStatus: string) => {
     try {
       console.log(`Updating payment status for order ${orderId} to ${paymentStatus}`);
-      const response = await axios.patch(`${ORDER_API_URL}/${orderId}/payment`, { paymentStatus });
+      const response = await orderApi.patch(`/${orderId}/payment`, { paymentStatus });
       console.log('Payment status updated successfully:', response.data);
       return response.data;
     } catch (error) {

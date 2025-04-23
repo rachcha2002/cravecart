@@ -15,6 +15,7 @@ import {
 import orderService from '../../services/orderService';
 import { toast } from 'react-hot-toast';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface OrderItem {
   name: string;
@@ -58,6 +59,7 @@ interface OrderDetails {
 const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, token } = useAuth();
   const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -76,6 +78,7 @@ const OrderDetailPage: React.FC = () => {
       return;
     }
 
+    // Remove authentication check to allow public access
     try {
       setLoading(true);
       console.log('Fetching order details for:', orderId);
@@ -122,6 +125,9 @@ const OrderDetailPage: React.FC = () => {
         setOrderDetails(formattedOrder);
         setLastUpdated(new Date());
         setError(null);
+        
+        // Store order details in sessionStorage to persist through refresh
+        sessionStorage.setItem(`order-${orderId}`, JSON.stringify(formattedOrder));
       } else {
         console.error('Failed to fetch order details:', response);
         setError('Unable to load order details. Please try again.');
@@ -129,15 +135,26 @@ const OrderDetailPage: React.FC = () => {
     } catch (err: any) {
       console.error('Error fetching order details:', err);
       setError(err.message || 'Failed to load order details');
+      
+      // Try to retrieve from sessionStorage if available
+      const storedOrder = sessionStorage.getItem(`order-${orderId}`);
+      if (storedOrder) {
+        try {
+          setOrderDetails(JSON.parse(storedOrder));
+          setError(null);
+          toast('Showing cached order details');
+        } catch (e) {
+          console.error('Error parsing stored order:', e);
+        }
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [id, navigate]);
 
   // Manually refresh order details
   const refreshOrder = useCallback(() => {
     if (id) {
-      toast.success('Refreshing order details...');
       fetchOrderDetails(id);
     }
   }, [id, fetchOrderDetails]);
@@ -187,12 +204,6 @@ const OrderDetailPage: React.FC = () => {
       eventSource.onopen = () => {
         console.log('SSE connection established');
         setSseConnected(true);
-        
-        // Show toast notification
-        toast.success('Connected to real-time order updates', {
-          id: 'sse-connected',
-          duration: 3000
-        });
       };
       
       eventSource.onerror = () => {
@@ -224,12 +235,6 @@ const OrderDetailPage: React.FC = () => {
         console.log('Polling for order updates (last resort)');
         fetchOrderDetails(id);
       }, 15000);
-      
-      // Show notification about polling mode
-      toast.error('Live updates offline, using polling instead', {
-        id: 'polling-mode',
-        duration: 3000
-      });
     }
     
     // Clean up interval on unmount or when either connection reconnects
@@ -244,12 +249,20 @@ const OrderDetailPage: React.FC = () => {
   // Initial order fetch
   useEffect(() => {
     if (id) {
+      // Try to load from sessionStorage first for immediate display
+      const storedOrder = sessionStorage.getItem(`order-${id}`);
+      if (storedOrder) {
+        try {
+          setOrderDetails(JSON.parse(storedOrder));
+          setLoading(false);
+        } catch (e) {
+          console.error('Error parsing stored order:', e);
+        }
+      }
+      
+      // Always fetch fresh data regardless of authentication
       console.log('Initial order fetch, then setting up real-time updates');
       fetchOrderDetails(id);
-      toast.success('Connecting to real-time order updates...', { 
-        id: 'connecting-updates',
-        duration: 2000
-      });
     }
   }, [id, fetchOrderDetails]);
   
@@ -405,24 +418,6 @@ const OrderDetailPage: React.FC = () => {
 
         {/* Connection Status Indicator */}
         <ConnectionStatusIndicator />
-
-        {/* Offline mode notification - only show when both SSE and socket are disconnected */}
-        {!sseConnected && !socketConnected && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 border border-yellow-100 dark:border-yellow-800 rounded-lg mb-6">
-            <div className="flex items-center">
-              <div className="shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700 dark:text-yellow-200">
-                  <strong>Notice:</strong> Live updates are currently unavailable. Order information will refresh every {isPolling ? '15 seconds' : 'time you manually refresh'}.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Order Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
