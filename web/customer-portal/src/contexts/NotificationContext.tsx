@@ -23,6 +23,7 @@ interface NotificationContextType {
   clearNotifications: () => void;
   socketConnected: boolean;
   reconnectSocket: () => void;
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
 }
 
 interface NotificationProviderProps {
@@ -222,7 +223,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       socket,
       clearNotifications,
       socketConnected,
-      reconnectSocket
+      reconnectSocket,
+      addNotification
     }}>
       {children}
     </NotificationContext.Provider>

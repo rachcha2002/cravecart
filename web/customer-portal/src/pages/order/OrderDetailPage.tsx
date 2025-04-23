@@ -60,11 +60,11 @@ const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, token } = useAuth();
+  const { addNotification, socket, socketConnected, reconnectSocket } = useNotifications();
   const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { socket, socketConnected, reconnectSocket } = useNotifications();
   const [isPolling, setIsPolling] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [sseConnected, setSseConnected] = useState<boolean>(false);
@@ -181,9 +181,20 @@ const OrderDetailPage: React.FC = () => {
         console.log('Refreshing order details from SSE update');
         fetchOrderDetails(id);
         
-        // Show toast notification for status updates
+        // Add notification to the notification bell
         if (data.type === 'status-update' && data.status) {
-          toast.success(`Order status updated to: ${formatStatus(data.status)}`, {
+          const statusMessage = `Order ${id} status updated to: ${formatStatus(data.status)}`;
+          
+          // Add to notification bell
+          addNotification({
+            type: 'order-status-update',
+            message: statusMessage,
+            orderId: id,
+            data: data.orderData
+          });
+          
+          // Show toast notification for status updates
+          toast.success(statusMessage, {
             id: `order-update-${Date.now()}`
           });
         }
@@ -220,7 +231,7 @@ const OrderDetailPage: React.FC = () => {
         sseRef.current = null;
       }
     };
-  }, [id]);
+  }, [id, fetchOrderDetails, addNotification]);
   
   // Only set up socket and polling as fallbacks if SSE is not connected
   useEffect(() => {
@@ -344,7 +355,12 @@ const OrderDetailPage: React.FC = () => {
       <div className="flex items-center space-x-2">
         {!sseConnected && !socketConnected && (
           <button 
-            onClick={refreshOrder}
+            onClick={() => {
+              // Try to reconnect both socket and SSE
+              reconnectSocket();
+              // Also refresh the order details
+              refreshOrder();
+            }}
             className="flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
           >
             <SignalIcon className="w-3 h-3 mr-1" />
