@@ -6,6 +6,7 @@ import { useCart } from "../hooks/useCart";
 import { motion, AnimatePresence } from "framer-motion";
 import SessionTimer from "./SessionTimer";
 import CartModal from "./CartModal";
+import NotificationBell from "./notification/NotificationBell";
 
 const Layout: React.FC = () => {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -84,6 +85,14 @@ const Layout: React.FC = () => {
               >
                 {isDarkMode ? "🌞" : "🌙"}
               </button>
+              
+              {/* Notification Bell - only show when user is logged in */}
+              {user && (
+                <div className="ml-4">
+                  <NotificationBell />
+                </div>
+              )}
+              
               {/* Cart */}
               <button
                 onClick={() => setIsCartOpen(true)}
@@ -221,6 +230,10 @@ const Layout: React.FC = () => {
                     >
                       My Orders
                     </Link>
+                    <div className="flex items-center px-3 py-2">
+                      <span className="text-base font-medium text-gray-600 dark:text-gray-300 mr-3">Notifications</span>
+                      <NotificationBell />
+                    </div>
                     <button
                       onClick={() => {
                         logout();
