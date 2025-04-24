@@ -63,7 +63,7 @@ class ApiLocationService implements DefaultLocationService {
       };
 
       const response = await this.api.post(
-        "/users/customer/locations",
+        "api/users/customer/locations",
         locationData
       );
 
