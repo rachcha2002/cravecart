@@ -46,11 +46,10 @@ const OrderUpdateListener: React.FC = () => {
             )
             .map((order: any) => order.orderId);
           
-          console.log('Active orders for live updates:', activeOrderIds);
           setActiveOrders(activeOrderIds);
         }
       } catch (error) {
-        console.error('Error fetching active orders for updates:', error);
+        // Error will be handled by the error boundary
       } finally {
         setIsLoading(false);
       }
@@ -68,19 +67,13 @@ const OrderUpdateListener: React.FC = () => {
   useEffect(() => {
     // Skip if still loading or no active orders
     if (isLoading || activeOrders.length === 0) return;
-
-    console.log('Setting up SSE connections for all active orders');
     
     // Create new SSE connections for each order
     activeOrders.forEach(orderId => {
       // Skip if connection already exists
       if (sseConnectionsRef.current[orderId]) return;
       
-      console.log(`Creating SSE connection for order ${orderId}`);
-      
       const eventSource = orderService.subscribeToOrderUpdates(orderId, (data) => {
-        console.log(`Received update for order ${orderId}:`, data);
-        
         // Process the update
         if (data.type === 'status-update' && data.status) {
           // Format the status for display
@@ -143,11 +136,6 @@ const OrderUpdateListener: React.FC = () => {
               data: data.orderData
             }
           }));
-          
-          // If the order is now complete, remove it from active orders on next refresh
-          if (data.status === 'delivered' || data.status === 'cancelled') {
-            console.log(`Order ${orderId} is now complete, will be removed from active tracking`);
-          }
         }
       });
       
@@ -159,10 +147,8 @@ const OrderUpdateListener: React.FC = () => {
     
     // Clean up function to close all SSE connections
     return () => {
-      console.log('Cleaning up all SSE connections');
       Object.entries(sseConnectionsRef.current).forEach(([orderId, eventSource]) => {
         if (eventSource) {
-          console.log(`Closing SSE connection for order ${orderId}`);
           eventSource.close();
         }
       });

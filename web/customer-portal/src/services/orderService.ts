@@ -46,54 +46,39 @@ orderApi.interceptors.response.use(
 // Helper for better error handling
 const handleApiError = (error: any, customMessage: string) => {
   if (error.response && error.response.data) {
-    console.error(`${customMessage}:`, error.response.data);
-    
     if (error.response.data.message) {
       throw new Error(error.response.data.message);
     }
   }
-  
-  console.error(customMessage, error);
   throw error;
 };
 
 // Add a new method for real-time order updates using SSE
 const subscribeToOrderUpdates = (orderId: string, callback: (data: any) => void) => {
-  console.log(`Subscribing to order updates for: ${orderId}`);
-  
   try {
     // Get authentication token
     const token = localStorage.getItem('token');
     if (!token) {
-      console.error('Cannot subscribe to updates: Authentication required');
       return null;
     }
     
     // Create EventSource connection to the server with authentication
     const eventSource = new EventSource(`${ORDER_API_URL}/${orderId}/updates?token=${token}`);
     
-    // Handle connection open
-    eventSource.onopen = () => {
-      console.log(`SSE connection established for order ${orderId}`);
-    };
-    
     // Handle incoming messages
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('Received order update via SSE:', data);
         callback(data);
       } catch (error) {
-        console.error('Error parsing SSE data:', error);
+        // Error will be handled by error boundary
       }
     };
     
     // Handle errors
     eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
       // Try to reconnect after a delay
       setTimeout(() => {
-        console.log('Attempting to reconnect SSE...');
         eventSource.close();
         subscribeToOrderUpdates(orderId, callback);
       }, 5000);
@@ -102,7 +87,6 @@ const subscribeToOrderUpdates = (orderId: string, callback: (data: any) => void)
     // Return the event source so it can be closed if needed
     return eventSource;
   } catch (error) {
-    console.error('Error setting up SSE connection:', error);
     return null;
   }
 };
@@ -111,9 +95,7 @@ const orderService = {
   // Create a new order
   createOrder: async (orderData: any) => {
     try {
-      console.log('Creating order with data:', orderData);
       const response = await orderApi.post('', orderData);
-      console.log('Order created successfully:', response.data);
       return response.data;
     } catch (error) {
       return handleApiError(error, 'Error creating order');
@@ -170,9 +152,7 @@ const orderService = {
   // Update payment status
   updatePaymentStatus: async (orderId: string, paymentStatus: string) => {
     try {
-      console.log(`Updating payment status for order ${orderId} to ${paymentStatus}`);
       const response = await orderApi.patch(`/${orderId}/payment`, { paymentStatus });
-      console.log('Payment status updated successfully:', response.data);
       return response.data;
     } catch (error) {
       return handleApiError(error, 'Error updating payment status');

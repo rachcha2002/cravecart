@@ -5,6 +5,8 @@ import { MapPinIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
 import { useCart } from "../../hooks/useCart";
 import { useAuth } from "../../contexts/AuthContext";
 import orderService from "../../services/orderService";
+import locationService from "../../services/locationService";
+import { DefaultLocation } from "../../types/locations";
 import { toast } from "react-hot-toast";
 
 // Fallback dummy data in case cart is empty
@@ -102,6 +104,10 @@ const OrderSummary: React.FC = () => {
     longitude: number;
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [userDefaultLocations, setUserDefaultLocations] = useState<DefaultLocation[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [selectedDefaultLocation, setSelectedDefaultLocation] = useState<DefaultLocation | null>(null);
+  const [showAddressSelector, setShowAddressSelector] = useState(false);
 
   // Generate a stable order ID that won't change on re-renders
   const [orderId, setOrderId] = useState<string>("");
@@ -111,9 +117,46 @@ const OrderSummary: React.FC = () => {
     setOrderId(`ORD-${Math.floor(10000 + Math.random() * 90000)}`);
   }, []);
 
+  // Load user's default locations when component mounts if user is logged in
+  useEffect(() => {
+    const loadUserLocations = async () => {
+      if (user?.id) {
+        setIsLoadingLocations(true);
+        try {
+          // First, set auth token for location service
+          const token = localStorage.getItem("token");
+          if (token) {
+            locationService.setAuthToken(token);
+          }
+          
+          const locations = await locationService.getLocations(user.id);
+          setUserDefaultLocations(locations);
+          
+          // If there's a default location, select it automatically
+          const defaultLocation = locations.find(loc => loc.isDefault);
+          if (defaultLocation) {
+            setSelectedDefaultLocation(defaultLocation);
+            setDeliveryAddress(defaultLocation.address);
+            setLocationCoordinates({
+              latitude: defaultLocation.latitude,
+              longitude: defaultLocation.longitude,
+            });
+            setAddressValidated(true);
+          }
+        } catch (error) {
+          console.error("Error loading user locations:", error);
+        } finally {
+          setIsLoadingLocations(false);
+        }
+      }
+    };
+    
+    loadUserLocations();
+  }, [user]);
+
   // Automatically try to get user's location on component mount
   useEffect(() => {
-    if (useCurrentLocation && navigator.geolocation) {
+    if (useCurrentLocation && navigator.geolocation && !selectedDefaultLocation) {
       setIsValidatingAddress(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -132,10 +175,13 @@ const OrderSummary: React.FC = () => {
         }
       );
     }
-  }, [useCurrentLocation]);
+  }, [useCurrentLocation, selectedDefaultLocation]);
 
   const handleAddressChange = (newAddress: string) => {
-    console.log("OrderSummary received address change:", newAddress);
+    // Reset default location selection if address is changed manually
+    if (selectedDefaultLocation && newAddress !== selectedDefaultLocation.address) {
+      setSelectedDefaultLocation(null);
+    }
 
     // Reset states if the address is empty
     if (!newAddress) {
@@ -168,20 +214,34 @@ const OrderSummary: React.FC = () => {
       }
 
       setIsValidatingAddress(false);
-      console.log(
-        "Address validation complete:",
-        newAddress,
-        "Validated:",
-        newAddress.length >= 10
-      );
     }, 500); // Reduced timeout for better UX
   };
 
   const handleLocationSelect = (lat: number, lng: number) => {
+    // Reset default location selection if coordinates change
+    if (selectedDefaultLocation) {
+      setSelectedDefaultLocation(null);
+    }
+    
     setLocationCoordinates({
       latitude: lat,
       longitude: lng,
     });
+  };
+
+  const handleDefaultLocationSelect = (location: DefaultLocation) => {
+    setSelectedDefaultLocation(location);
+    setDeliveryAddress(location.address);
+    setLocationCoordinates({
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+    setAddressValidated(true);
+    setShowAddressSelector(false);
+  };
+
+  const toggleAddressSelector = () => {
+    setShowAddressSelector(!showAddressSelector);
   };
 
   const handleProceedToPayment = async () => {
@@ -225,7 +285,6 @@ const OrderSummary: React.FC = () => {
 
       // Save the order to the order service
       const createdOrder = await orderService.createOrder(orderData);
-      console.log("Order created:", createdOrder);
 
       // Create payment data
       const paymentData = {
@@ -243,7 +302,6 @@ const OrderSummary: React.FC = () => {
       // Navigate to payment page with payment data
       navigate("/payment", { state: { orderData: paymentData } });
     } catch (error) {
-      console.error("Error creating order:", error);
       toast.error("Failed to create order. Please try again.");
     } finally {
       setIsProcessing(false);
@@ -344,96 +402,99 @@ const OrderSummary: React.FC = () => {
             Delivery Details
           </h3>
 
-          <div className="mb-4">
-            <div className="flex items-start mb-3">
-              <MapPinIcon
-                className={`h-6 w-6 mt-1 mr-2 flex-shrink-0 ${
-                  addressValidated ? "text-green-500" : "text-blue-500"
-                }`}
-              />
-              <div>
-                <p className="font-medium text-gray-700 dark:text-gray-200 text-base md:text-lg">
-                  Delivery Address
-                </p>
-                {deliveryAddress && !isValidatingAddress ? (
-                  <div className="flex items-center">
-                    <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg">
-                      {deliveryAddress}
-                    </p>
-                    {addressValidated && (
-                      <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
-                    )}
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+              Delivery Location
+            </h3>
+            
+            {/* User's Default Locations */}
+            {user && (
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Delivery Address</span>
+                  
+                  {userDefaultLocations.length > 0 && (
+                    <button
+                      onClick={toggleAddressSelector}
+                      className="text-blue-600 dark:text-blue-400 text-sm hover:underline flex items-center"
+                    >
+                      {showAddressSelector ? "Hide Address Book" : "Choose from Address Book"}
+                    </button>
+                  )}
+                </div>
+                
+                {isLoadingLocations ? (
+                  <div className="p-4 flex justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                   </div>
                 ) : (
-                  <p className="text-gray-400 dark:text-gray-500 italic text-base md:text-lg">
-                    {isValidatingAddress
-                      ? "Getting your location..."
-                      : "Please set your delivery address"}
-                  </p>
+                  <>
+                    {showAddressSelector && userDefaultLocations.length > 0 && (
+                      <div className="mb-4 bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                        <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Your Saved Locations</h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {userDefaultLocations.map(location => (
+                            <div 
+                              key={location.id}
+                              onClick={() => handleDefaultLocationSelect(location)}
+                              className={`cursor-pointer p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 flex items-start
+                                ${selectedDefaultLocation?.id === location.id ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800' : ''}
+                              `}
+                            >
+                              <MapPinIcon className={`h-5 w-5 mr-2 flex-shrink-0 ${location.isDefault ? 'text-blue-500' : 'text-gray-400'}`} />
+                              <div className="flex-1">
+                                <div className="font-medium">{location.name}</div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">{location.address}</div>
+                                {location.isDefault && (
+                                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full mt-1 inline-block">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            </div>
-
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 md:p-5 mb-4">
-              <h4 className="font-medium text-blue-700 dark:text-blue-300 mb-1 text-base md:text-lg">
-                Delivery Location
-              </h4>
-              <p className="text-sm md:text-base text-blue-600 dark:text-blue-300 mb-2 md:mb-3">
-                We need your exact delivery location. The quickest way is to:
-              </p>
-              <ul className="text-sm md:text-base text-blue-600 dark:text-blue-300 list-disc pl-5 mb-2 md:mb-3">
-                <li className="font-medium">
-                  Click "Use Current Location" below (recommended)
-                </li>
-                <li>Or enter your address manually</li>
-                <li>Or search for an address using the map</li>
-                <li>Or click directly on the map to select a location</li>
-              </ul>
-
-              <LocationSelector
-                initialAddress={deliveryAddress}
-                onAddressChange={handleAddressChange}
-                onLocationSelect={handleLocationSelect}
-              />
-            </div>
-
-            {isValidatingAddress && (
-              <p className="text-sm md:text-base text-blue-600 dark:text-blue-400 animate-pulse flex items-center">
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600 dark:text-blue-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Validating address...
-              </p>
             )}
-
+            
+            {/* Location Selection */}
+            {!selectedDefaultLocation || showAddressSelector ? (
+              <div className={selectedDefaultLocation ? 'mt-4' : ''}>
+                <LocationSelector
+                  initialAddress={deliveryAddress}
+                  onAddressChange={handleAddressChange}
+                  onLocationSelect={handleLocationSelect}
+                />
+              </div>
+            ) : (
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-md flex items-start">
+                <MapPinIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium text-gray-800 dark:text-white">{selectedDefaultLocation.name}</div>
+                  <div className="text-gray-600 dark:text-gray-300">{selectedDefaultLocation.address}</div>
+                  <button 
+                    onClick={() => setShowAddressSelector(true)} 
+                    className="text-blue-600 dark:text-blue-400 text-sm mt-2 hover:underline"
+                  >
+                    Change location
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {validationError && (
-              <p className="text-sm md:text-base text-red-600 dark:text-red-400 mt-1">
-                {validationError}
-              </p>
+              <p className="mt-2 text-red-600 dark:text-red-400 text-sm">{validationError}</p>
             )}
-
-            {addressChanged && addressValidated && !isValidatingAddress && (
-              <p className="text-sm md:text-base text-green-600 dark:text-green-400 mt-1 flex items-center">
-                <CheckCircleIcon className="h-5 w-5 mr-1" />
-                Delivery address updated successfully!
-              </p>
+            
+            {addressValidated && (
+              <div className="mt-3 text-sm text-green-600 dark:text-green-400 flex items-center">
+                <CheckCircleIcon className="h-4 w-4 mr-1" />
+                Address validated successfully
+              </div>
             )}
           </div>
         </div>

@@ -78,10 +78,8 @@ const OrderDetailPage: React.FC = () => {
       return;
     }
 
-    // Remove authentication check to allow public access
     try {
       setLoading(true);
-      console.log('Fetching order details for:', orderId);
       const response = await orderService.getOrder(orderId);
       
       if (response.success && response.data) {
@@ -129,11 +127,9 @@ const OrderDetailPage: React.FC = () => {
         // Store order details in sessionStorage to persist through refresh
         sessionStorage.setItem(`order-${orderId}`, JSON.stringify(formattedOrder));
       } else {
-        console.error('Failed to fetch order details:', response);
         setError('Unable to load order details. Please try again.');
       }
     } catch (err: any) {
-      console.error('Error fetching order details:', err);
       setError(err.message || 'Failed to load order details');
       
       // Try to retrieve from sessionStorage if available
@@ -144,7 +140,7 @@ const OrderDetailPage: React.FC = () => {
           setError(null);
           toast('Showing cached order details');
         } catch (e) {
-          console.error('Error parsing stored order:', e);
+          // Error parsing stored order will be handled by error boundary
         }
       }
     } finally {
@@ -163,26 +159,17 @@ const OrderDetailPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
     
-    console.log('Setting up direct SSE connection for order updates');
-    
     // Clean up any existing SSE connection
     if (sseRef.current) {
-      console.log('Closing existing SSE connection');
       sseRef.current.close();
       sseRef.current = null;
     }
     
     // Subscribe to order updates
     const eventSource = orderService.subscribeToOrderUpdates(id, (data) => {
-      console.log('Received real-time order update via SSE:', data);
-      
       // Update the order details
       if (data.orderData) {
-        console.log('Refreshing order details from SSE update');
         fetchOrderDetails(id);
-        
-        // We don't need to add notifications here anymore as it's handled by OrderUpdateListener
-        // Just update the local UI state
         
         // Update last updated timestamp
         setLastUpdated(new Date());
@@ -198,12 +185,10 @@ const OrderDetailPage: React.FC = () => {
       
       // Set up event handlers
       eventSource.onopen = () => {
-        console.log('SSE connection established');
         setSseConnected(true);
       };
       
       eventSource.onerror = () => {
-        console.log('SSE connection error');
         setSseConnected(false);
       };
     }
@@ -211,7 +196,6 @@ const OrderDetailPage: React.FC = () => {
     // Clean up on unmount
     return () => {
       if (sseRef.current) {
-        console.log('Cleaning up SSE connection');
         sseRef.current.close();
         sseRef.current = null;
       }
@@ -224,11 +208,8 @@ const OrderDetailPage: React.FC = () => {
     
     // Only start polling if both SSE and socket are disconnected
     if (!sseConnected && !socketConnected && id) {
-      console.log('Both SSE and socket disconnected, starting polling as last resort');
-      
       // Poll every 15 seconds
       pollingInterval = setInterval(() => {
-        console.log('Polling for order updates (last resort)');
         fetchOrderDetails(id);
       }, 15000);
     }
@@ -236,7 +217,6 @@ const OrderDetailPage: React.FC = () => {
     // Clean up interval on unmount or when either connection reconnects
     return () => {
       if (pollingInterval) {
-        console.log('Stopping polling');
         clearInterval(pollingInterval);
       }
     };
@@ -250,14 +230,12 @@ const OrderDetailPage: React.FC = () => {
       if (storedOrder) {
         try {
           setOrderDetails(JSON.parse(storedOrder));
-          setLoading(false);
         } catch (e) {
-          console.error('Error parsing stored order:', e);
+          // Error parsing stored order will be handled by error boundary
         }
       }
       
-      // Always fetch fresh data regardless of authentication
-      console.log('Initial order fetch, then setting up real-time updates');
+      // Then fetch fresh data
       fetchOrderDetails(id);
     }
   }, [id, fetchOrderDetails]);
