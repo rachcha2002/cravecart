@@ -904,6 +904,76 @@ const createAdmin = async (req, res) => {
   }
 };
 
+const getUsersByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
+    const { status = "active" } = req.query;
+
+    // Validate role
+    const validRoles = ["customer", "restaurant", "delivery", "admin"];
+    if (!validRoles.includes(role.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid role",
+      });
+    }
+
+    // Find users by role and status
+    const users = await User.find({
+      role: role.toLowerCase(),
+      status: status.toLowerCase(),
+    }).select("_id email phoneNumber name");
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users by role:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch users",
+    });
+  }
+};
+
+/**
+ * Get user contact information by ID (no auth required)
+ * @route GET /api/users/contact/:id
+ * @access Public
+ */
+const getUserContactInfo = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find user and select only contact information
+    const user = await User.findById(id).select("email phoneNumber name _id");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        userId: user._id,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        name: user.name,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user contact info:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user contact information",
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -928,4 +998,6 @@ module.exports = {
   verifyDeliveryDocument,
   resetUserPassword,
   createAdmin,
+  getUsersByRole,
+  getUserContactInfo,
 };

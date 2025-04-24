@@ -1,0 +1,692 @@
+// notificationController.js
+const Notification = require("../models/Notification");
+const axios = require("axios");
+const winston = require("winston");
+const { sendNotificationEmail } = require("../services/emailService");
+const { sendNotificationSMS } = require("../services/smsService");
+
+// Configure logger - minimal version
+const logger = winston.createLogger({
+  level: "error",
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.File({ filename: "error.log", level: "error" }),
+  ],
+});
+
+// Socket.io instance
+let io;
+
+const setSocketIO = (socketIO) => {
+  io = socketIO;
+};
+
+// In-app notification with minimal logging
+const sendInApp = async (userId, notification) => {
+  try {
+    if (io) {
+      io.to(userId.toString()).emit("notification", notification);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    logger.error("In-app notification failed:", error.message);
+    return false;
+  }
+};
+
+/**
+ * Create and send notifications to users based on their roles
+ */
+const createNotification = async (req, res) => {
+  try {
+    const {
+      title,
+      message,
+      roles,
+      channels,
+      actionUrl,
+      actionText,
+      attachments,
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !message || !roles || !channels) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: title, message, roles, or channels",
+      });
+    }
+
+    // Normalize roles and channels to uppercase
+    const normalizedRoles = roles.map((role) => role.toUpperCase());
+    const normalizedChannels = channels.map((channel) =>
+      channel.toUpperCase().replace("-", "_")
+    );
+
+    // Create notification document
+    const notification = new Notification({
+      title,
+      message,
+      roles: normalizedRoles,
+      channels: normalizedChannels,
+      receivers: [],
+    });
+
+    // Fetch users for each role
+    const allUsers = [];
+    for (const role of normalizedRoles) {
+      try {
+        const response = await axios.get(
+          `${process.env.USER_SERVICE_URL}/api/users/role/${role}`
+        );
+
+        if (response.data && response.data.success) {
+          allUsers.push(...response.data.data);
+        }
+      } catch (error) {
+        logger.error(`Failed to fetch users for role ${role}:`, error.message);
+      }
+    }
+
+    if (allUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "No users found for the specified roles",
+      });
+    }
+
+    // Create receiver entries and send notifications
+    const notificationResults = [];
+
+    for (const user of allUsers) {
+      // Skip if no contact information
+      if (!user.email && !user.phoneNumber) {
+        continue;
+      }
+
+      const receiverData = {
+        userId: user._id,
+        receivingData: [],
+      };
+
+      // Send notifications through each channel
+      for (const channel of normalizedChannels) {
+        let sent = false;
+        let sentAt = null;
+        let errorMessage = null;
+
+        try {
+          switch (channel) {
+            case "EMAIL":
+              if (
+                !user.email ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)
+              ) {
+                errorMessage = !user.email
+                  ? "User email not found"
+                  : "Invalid email format";
+                break;
+              }
+
+              const htmlContent = `
+                      <!DOCTYPE html>
+                      <html lang="en">
+                      <head>
+                          <meta charset="UTF-8">
+                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                          <title>CraveCart Notification</title>
+                          <style>
+                              body, html {
+                                  margin: 0;
+                                  padding: 0;
+                                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                  line-height: 1.6;
+                                  color: #333;
+                                  background-color: #f8f9fa;
+                              }
+                              .email-container {
+                                  max-width: 600px;
+                                  margin: 0 auto;
+                                  background-color: #ffffff;
+                                  border-radius: 8px;
+                                  overflow: hidden;
+                                  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                              }
+                              .email-header {
+                                  background-color: #FF6B35;
+                                  padding: 20px;
+                                  text-align: center;
+                              }
+                              .logo {
+                                  max-width: 180px;
+                                  height: auto;
+                              }
+                              .email-content {
+                                  padding: 30px;
+                              }
+                              .email-title {
+                                  font-size: 24px;
+                                  font-weight: 600;
+                                  color: #FF6B35;
+                                  margin-bottom: 20px;
+                              }
+                              .email-message {
+                                  font-size: 16px;
+                                  color: #555;
+                                  margin-bottom: 25px;
+                              }
+                              .cta-button {
+                                  display: inline-block;
+                                  background-color: #FF6B35;
+                                  color: #ffffff !important;
+                                  text-decoration: none;
+                                  padding: 12px 24px;
+                                  border-radius: 4px;
+                                  font-weight: 600;
+                                  margin-top: 10px;
+                              }
+                              .email-footer {
+                                  background-color: #f1f1f1;
+                                  padding: 20px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777;
+                              }
+                              
+                              @media screen and (max-width: 480px) {
+                                  .email-container {
+                                      width: 100%;
+                                      border-radius: 0;
+                                  }
+                                  .email-content {
+                                      padding: 20px;
+                                  }
+                                  .email-title {
+                                      font-size: 20px;
+                                  }
+                              }
+                          </style>
+                      </head>
+                      <body>
+                          <div class="email-container">
+                              <div class="email-header">
+                                  <img src="https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745527245/logo_jxgxfg.png" alt="CraveCart Logo" class="logo">
+                              </div>
+                              <div class="email-content">
+                                  <h1 class="email-title">${title}</h1>
+                                  <div class="email-message">
+                                      ${message}
+                                  </div>
+                                  <a href="${
+                                    actionUrl || process.env.CLIENT_URL
+                                  }" class="cta-button">${
+                actionText || "Visit CraveCart"
+              }</a>
+                              </div>
+                              <div class="email-footer">
+                                  <p>© ${new Date().getFullYear()} CraveCart. All rights reserved.</p>
+                                  <p>This is an automated notification. Please do not reply to this email.</p>
+                                  
+                              </div>
+                          </div>
+                      </body>
+                      </html>
+                      `;
+
+              // Prepare email options with HTML and optional attachments
+              const emailOptions = {
+                html: htmlContent,
+              };
+
+              // Add attachments if provided
+              if (attachments && Array.isArray(attachments)) {
+                emailOptions.attachments = attachments;
+              }
+
+              sent = await sendNotificationEmail(
+                user.email,
+                title,
+                message,
+                emailOptions
+              );
+              break;
+
+            case "SMS":
+              if (
+                !user.phoneNumber ||
+                !/^\+?[\d\s-]{10,}$/.test(user.phoneNumber)
+              ) {
+                errorMessage = !user.phoneNumber
+                  ? "User phone number not found"
+                  : "Invalid phone number format";
+                break;
+              }
+              sent = await sendNotificationSMS(user.phoneNumber, message);
+              break;
+
+            case "IN_APP":
+              // For in-app notifications, also pass the actionUrl and actionText if available
+              const inAppNotification = {
+                title,
+                message,
+                actionUrl: actionUrl || null,
+                actionText: actionText || null,
+              };
+              sent = await sendInApp(user._id, inAppNotification);
+              break;
+
+            default:
+              errorMessage = `Unsupported channel: ${channel}`;
+          }
+        } catch (error) {
+          errorMessage = error.message;
+        }
+
+        if (sent) {
+          sentAt = new Date();
+        }
+
+        receiverData.receivingData.push({
+          channel,
+          status: sent ? "SENT" : "FAILED",
+          sentAt,
+          error: errorMessage,
+        });
+      }
+
+      // Only add to notification if at least one channel was attempted
+      if (receiverData.receivingData.length > 0) {
+        notification.receivers.push(receiverData);
+        notificationResults.push({
+          userId: user._id,
+          channels: receiverData.receivingData,
+        });
+      }
+    }
+
+    // Check if any notifications were sent
+    if (notification.receivers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "No valid users found with required contact information for the specified channels",
+      });
+    }
+
+    await notification.save();
+
+    const response = {
+      success: true,
+      message: "Notifications sent successfully",
+      data: {
+        notificationId: notification._id,
+        totalUsers: allUsers.length,
+        results: notificationResults,
+      },
+    };
+
+    res.status(201).json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to create notification",
+      details: error.message,
+    });
+  }
+};
+
+const getNotificationsByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
+    const { channel, status, limit = 10, page = 1 } = req.query;
+
+    const query = { roles: role };
+    if (channel) {
+      query["receivers.receivingData.channel"] = channel;
+    }
+    if (status) {
+      query["receivers.receivingData.status"] = status;
+    }
+
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const total = await Notification.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: notifications,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error("Failed to fetch notifications:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch notifications",
+    });
+  }
+};
+
+/**
+ * Send notification directly to specific users by their IDs
+ */
+const sendDirectNotification = async (req, res) => {
+  try {
+    const {
+      title,
+      message,
+      userIds,
+      channels,
+      actionUrl,
+      actionText,
+      attachments,
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !message || !userIds || !channels) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: title, message, userIds, or channels",
+      });
+    }
+
+    // Ensure userIds is an array
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({
+        success: false,
+        error: "userIds must be an array of user IDs",
+      });
+    }
+
+    // Normalize channels to uppercase
+    const normalizedChannels = channels.map((channel) =>
+      channel.toUpperCase().replace("-", "_")
+    );
+
+    // Create notification document
+    const notification = new Notification({
+      title,
+      message,
+      userIds, // Store the direct user IDs
+      channels: normalizedChannels,
+      actionUrl: actionUrl || null,
+      actionText: actionText || null,
+      receivers: [],
+    });
+
+    // Fetch user details for each user ID
+    const allUsers = [];
+    for (const userId of userIds) {
+      try {
+        const response = await axios.get(
+          `${process.env.USER_SERVICE_URL}/api/users/${userId}`
+        );
+
+        if (response.data && response.data.success) {
+          allUsers.push(response.data.data);
+        }
+      } catch (error) {
+        logger.error(`Failed to fetch user with ID ${userId}:`, error.message);
+      }
+    }
+
+    if (allUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "No valid users found for the specified IDs",
+      });
+    }
+
+    // Create receiver entries and send notifications
+    const notificationResults = [];
+
+    for (const user of allUsers) {
+      // Skip if no contact information
+      if (!user.email && !user.phoneNumber) {
+        continue;
+      }
+
+      const receiverData = {
+        userId: user._id,
+        receivingData: [],
+      };
+
+      // Send notifications through each channel
+      for (const channel of normalizedChannels) {
+        let sent = false;
+        let sentAt = null;
+        let errorMessage = null;
+
+        try {
+          switch (channel) {
+            case "EMAIL":
+              if (
+                !user.email ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)
+              ) {
+                errorMessage = !user.email
+                  ? "User email not found"
+                  : "Invalid email format";
+                break;
+              }
+
+              const htmlContent = `
+                      <!DOCTYPE html>
+                      <html lang="en">
+                      <head>
+                          <meta charset="UTF-8">
+                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                          <title>CraveCart Notification</title>
+                          <style>
+                              body, html {
+                                  margin: 0;
+                                  padding: 0;
+                                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                  line-height: 1.6;
+                                  color: #333;
+                                  background-color: #f8f9fa;
+                              }
+                              .email-container {
+                                  max-width: 600px;
+                                  margin: 0 auto;
+                                  background-color: #ffffff;
+                                  border-radius: 8px;
+                                  overflow: hidden;
+                                  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                              }
+                              .email-header {
+                                  background-color: #FF6B35;
+                                  padding: 20px;
+                                  text-align: center;
+                              }
+                              .logo {
+                                  max-width: 180px;
+                                  height: auto;
+                              }
+                              .email-content {
+                                  padding: 30px;
+                              }
+                              .email-title {
+                                  font-size: 24px;
+                                  font-weight: 600;
+                                  color: #FF6B35;
+                                  margin-bottom: 20px;
+                              }
+                              .email-message {
+                                  font-size: 16px;
+                                  color: #555;
+                                  margin-bottom: 25px;
+                              }
+                              .cta-button {
+                                  display: inline-block;
+                                  background-color: #FF6B35;
+                                  color: #ffffff !important;
+                                  text-decoration: none;
+                                  padding: 12px 24px;
+                                  border-radius: 4px;
+                                  font-weight: 600;
+                                  margin-top: 10px;
+                              }
+                              .email-footer {
+                                  background-color: #f1f1f1;
+                                  padding: 20px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777;
+                              }
+                              
+                              @media screen and (max-width: 480px) {
+                                  .email-container {
+                                      width: 100%;
+                                      border-radius: 0;
+                                  }
+                                  .email-content {
+                                      padding: 20px;
+                                  }
+                                  .email-title {
+                                      font-size: 20px;
+                                  }
+                              }
+                          </style>
+                      </head>
+                      <body>
+                          <div class="email-container">
+                              <div class="email-header">
+                                  <img src="https://i.ibb.co/DLDDLJG/cravecart-logo.png" alt="CraveCart Logo" class="logo">
+                              </div>
+                              <div class="email-content">
+                                  <h1 class="email-title">${title}</h1>
+                                  <div class="email-message">
+                                      ${message}
+                                  </div>
+                                  <a href="${
+                                    actionUrl || process.env.CLIENT_URL
+                                  }" class="cta-button">${
+                actionText || "Visit CraveCart"
+              }</a>
+                              </div>
+                              <div class="email-footer">
+                                  <p>© ${new Date().getFullYear()} CraveCart. All rights reserved.</p>
+                                  <p>This is an automated notification. Please do not reply to this email.</p>
+                                  
+                              </div>
+                          </div>
+                      </body>
+                      </html>
+                      `;
+
+              // Send email with HTML and optional attachments
+              const emailOptions = {
+                html: htmlContent,
+              };
+
+              // Add attachments if provided
+              if (attachments && Array.isArray(attachments)) {
+                emailOptions.attachments = attachments;
+              }
+
+              sent = await sendNotificationEmail(
+                user.email,
+                title,
+                message,
+                emailOptions
+              );
+              break;
+
+            case "SMS":
+              if (
+                !user.phoneNumber ||
+                !/^\+?[\d\s-]{10,}$/.test(user.phoneNumber)
+              ) {
+                errorMessage = !user.phoneNumber
+                  ? "User phone number not found"
+                  : "Invalid phone number format";
+                break;
+              }
+              sent = await sendNotificationSMS(user.phoneNumber, message);
+              break;
+
+            case "IN_APP":
+              // For in-app notifications, also pass the actionUrl and actionText if available
+              const inAppNotification = {
+                title,
+                message,
+                actionUrl: actionUrl || null,
+                actionText: actionText || null,
+              };
+              sent = await sendInApp(user._id, inAppNotification);
+              break;
+
+            default:
+              errorMessage = `Unsupported channel: ${channel}`;
+          }
+        } catch (error) {
+          errorMessage = error.message;
+        }
+
+        if (sent) {
+          sentAt = new Date();
+        }
+
+        receiverData.receivingData.push({
+          channel,
+          status: sent ? "SENT" : "FAILED",
+          sentAt,
+          error: errorMessage,
+        });
+      }
+
+      // Only add to notification if at least one channel was attempted
+      if (receiverData.receivingData.length > 0) {
+        notification.receivers.push(receiverData);
+        notificationResults.push({
+          userId: user._id,
+          channels: receiverData.receivingData,
+        });
+      }
+    }
+
+    // Check if any notifications were sent
+    if (notification.receivers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "No valid users found with required contact information for the specified channels",
+      });
+    }
+
+    await notification.save();
+
+    const response = {
+      success: true,
+      message: "Direct notifications sent successfully",
+      data: {
+        notificationId: notification._id,
+        totalUsers: allUsers.length,
+        results: notificationResults,
+      },
+    };
+
+    res.status(201).json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to send direct notifications",
+      details: error.message,
+    });
+  }
+};
+
+module.exports = {
+  createNotification,
+  getNotificationsByRole,
+  sendDirectNotification,
+  setSocketIO,
+};
