@@ -9,7 +9,7 @@ import {
   SunIcon,
   MoonIcon,
 } from '@heroicons/react/24/outline';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../hooks/useCart';
 import { toggleTheme } from '../features/theme/themeSlice';
 import CartModal from './CartModal';
