@@ -8,12 +8,13 @@ import {
   UserIcon,
   SunIcon,
   MoonIcon,
-} from '@heroicons/react/24/outline';
-import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../hooks/useCart';
-import { toggleTheme } from '../features/theme/themeSlice';
-import CartModal from './CartModal';
-import NotificationBell from './notification/NotificationBell';
+
+} from "@heroicons/react/24/outline";
+import { useCart } from "../hooks/useCart";
+import { toggleTheme } from "../features/theme/themeSlice";
+import CartModal from "./CartModal";
+import NotificationBell from "./notification/NotificationBell";
+import { useAuth } from "../contexts/AuthContext";
 
 const Navbar = () => {
   const dispatch = useDispatch();
@@ -173,6 +174,5 @@ const Navbar = () => {
     </>
   );
 };
-
 
 export default Navbar;

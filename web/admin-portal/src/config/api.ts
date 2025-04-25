@@ -1,4 +1,6 @@
 const baseURL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
+const notificationServiceURL =
+  process.env.REACT_APP_NOTIFICATION_SERVICE_URL || "http://localhost:5005";
 
 export const api = {
   baseURL,
@@ -39,6 +41,11 @@ export const api = {
       getSales: `${baseURL}/api/reports/sales`,
       getUsers: `${baseURL}/api/reports/users`,
       getRestaurants: `${baseURL}/api/reports/restaurants`,
+    },
+    notifications: {
+      getAll: `${notificationServiceURL}/api/notifications`,
+      markAsRead: `${notificationServiceURL}/api/notifications`,
+      markAllAsRead: `${notificationServiceURL}/api/notifications/read-all`,
     },
   },
 };

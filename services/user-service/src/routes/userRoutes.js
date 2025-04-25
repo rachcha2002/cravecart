@@ -115,4 +115,10 @@ router.patch(
 router.get("/me", auth, userController.getCurrentUser);
 router.patch("/me/deactivate", auth, userController.deactivateOwnAccount);
 
+// Get users by role
+router.get("/role/:role", userController.getUsersByRole);
+
+// Get user contact info by ID (no auth required)
+router.get("/contact/:id", userController.getUserContactInfo);
+
 module.exports = router;
