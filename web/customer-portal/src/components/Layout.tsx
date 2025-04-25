@@ -4,14 +4,18 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../hooks/useCart";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNotifications } from "../contexts/NotificationContext";
 import SessionTimer from "./SessionTimer";
 import CartModal from "./CartModal";
 import NotificationBell from "./notification/NotificationBell";
+import OrderUpdateListener from "./order/OrderUpdateListener";
+import { Toaster } from 'react-hot-toast';
 
 const Layout: React.FC = () => {
   const { isDarkMode, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const { items } = useCart();
+  const { unreadCount } = useNotifications();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
@@ -22,12 +26,12 @@ const Layout: React.FC = () => {
       { label: "About", path: "/about" },
       { label: "Contact", path: "/contact" },
     ];
-    
+
     // Add "My Orders" only for authenticated users
     if (user) {
       items.push({ label: "My Orders", path: "/orders" });
     }
-    
+
     return items;
   }, [user]);
 
@@ -39,6 +43,9 @@ const Layout: React.FC = () => {
         isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
       }`}
     >
+      {/* Include the OrderUpdateListener component for global order updates */}
+      {user && <OrderUpdateListener />}
+      
       {/* Navigation */}
       <nav
         className={`fixed w-full z-50 ${
@@ -88,7 +95,7 @@ const Layout: React.FC = () => {
               
               {/* Notification Bell - only show when user is logged in */}
               {user && (
-                <div className="ml-4">
+                <div className="hidden md:block ml-4">
                   <NotificationBell />
                 </div>
               )}
@@ -157,9 +164,14 @@ const Layout: React.FC = () => {
               {/* Mobile menu button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden ml-4 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="md:hidden ml-4 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 relative"
               >
                 {isMobileMenuOpen ? "✕" : "☰"}
+                {user && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full md:hidden">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -230,9 +242,18 @@ const Layout: React.FC = () => {
                     >
                       My Orders
                     </Link>
-                    <div className="flex items-center px-3 py-2">
-                      <span className="text-base font-medium text-gray-600 dark:text-gray-300 mr-3">Notifications</span>
-                      <NotificationBell />
+                    <div className="px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-base font-medium text-gray-600 dark:text-gray-300">Notifications</span>
+                        {unreadCount > 0 && (
+                          <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                            {unreadCount} new
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <NotificationBell />
+                      </div>
                     </div>
                     <button
                       onClick={() => {
@@ -253,92 +274,25 @@ const Layout: React.FC = () => {
 
       {/* Main Content */}
       <main className="pt-16">
-        <Outlet />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Outlet />
+        </div>
       </main>
 
-      {/* Add the session timer */}
-      <SessionTimer />
-
-      {/* Cart Modal */}
+      {/* Modals and Overlays */}
       <CartModal isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-
-      {/* Footer */}
-      <footer
-        className={`${isDarkMode ? "bg-gray-800" : "bg-gray-100"} mt-auto`}
-      >
-        <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-4">About Us</h3>
-              <p className="opacity-80">
-                We deliver the best food experiences right to your doorstep.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-              <ul className="space-y-2">
-                <li>
-                  <Link to="/about" className="hover:underline">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/contact" className="hover:underline">
-                    Contact
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/terms" className="hover:underline">
-                    Terms & Conditions
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Connect With Us</h3>
-              <div className="flex space-x-4">
-                <a
-                  href="https://apps.apple.com/foodie"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:opacity-80"
-                >
-                  📱
-                </a>
-                <a
-                  href="https://facebook.com/foodie"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:opacity-80"
-                >
-                  📘
-                </a>
-                <a
-                  href="https://instagram.com/foodie"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:opacity-80"
-                >
-                  📸
-                </a>
-                <a
-                  href="https://twitter.com/foodie"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:opacity-80"
-                >
-                  🐦
-                </a>
-              </div>
-            </div>
-          </div>
-          <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700 text-center">
-            <p className="text-sm opacity-80">
-              © {new Date().getFullYear()} Food Delivery. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      
+      {/* Toast Container */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: isDarkMode ? '#374151' : '#ffffff',
+            color: isDarkMode ? '#ffffff' : '#000000',
+          },
+        }}
+      />
     </div>
   );
 };

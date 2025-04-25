@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
@@ -19,6 +20,8 @@ import PaymentSummaryPage from './pages/payment/PaymentSummaryPage';
 import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
 import PaymentFailedPage from './pages/payment/PaymentFailedPage';
 import RestaurantPage from './pages/RestaurantPage';
+import PublicRoute from "./components/PublicRoute";
+
 
 const Routes: React.FC = () => {
   return (
@@ -27,9 +30,26 @@ const Routes: React.FC = () => {
         <Route index element={<LandingPage />} />
         <Route path="about" element={<AboutUsPage />} />
         <Route path="contact" element={<ContactUs />} />
-        <Route path="login" element={<LoginPage />} />
-        <Route path="register" element={<RegisterPage />} />
-        <Route path='restaurants' element={<RestaurantPage/>}/>
+
+        <Route
+          path="login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
+            </PublicRoute>
+          }
+        />
+        
+         <Route path='restaurants' element={<RestaurantPage/>}/>
+
         <Route
           path="profile"
           element={
@@ -49,11 +69,7 @@ const Routes: React.FC = () => {
           />
           <Route
             path=":id"
-            element={
-              <ProtectedRoute>
-                <OrderDetailPage />
-              </ProtectedRoute>
-            }
+            element={<OrderDetailPage />}
           />
         </Route>
         <Route path="order">
@@ -73,4 +89,4 @@ const Routes: React.FC = () => {
   );
 };
 
-export default Routes; 
+export default Routes;

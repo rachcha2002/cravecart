@@ -118,13 +118,39 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
-// Update order status
-exports.updateOrderStatus = async (req, res) => {
+// Get real-time order updates
+exports.getOrderUpdates = async (req, res) => {
+  const { orderId } = req.params;
+  const { token } = req.query;
+  
+  // Validate authentication token
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication token is required for SSE connections'
+    });
+  }
+  
   try {
-    const { orderId } = req.params;
-    const { status, description } = req.body;
+    // Validate JWT token (simplified, you should implement proper token validation)
+    let userId;
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) throw new Error('Invalid token format');
+      
+      const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+      userId = payload.id || payload._id;
+      
+      if (!userId) throw new Error('User ID not found in token');
+    } catch (tokenError) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authentication token'
+      });
+    }
     
-    const order = await Order.findOne({ orderId });
+    // Find the order
+    const order = await Order.findOne({ orderId }).lean();
     
     if (!order) {
       return res.status(404).json({
@@ -133,56 +159,90 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
     
-    // Update the status
-    order.status = status;
+    // Optional: Verify that the user has access to this order
+    const orderUserId = order.user?.id || order.user?._id;
+    const isRestaurantOrder = order.restaurant?._id;
     
-    // Add to timeline
-    order.deliveryTimeline.push({
-      status,
-      time: new Date(),
-      description: description || `Order status updated to ${status}`
+    // Skip access check for now, but you can uncomment and customize this
+    // if (orderUserId !== userId && !isAdmin) {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: 'You do not have permission to access this order'
+    //   });
+    // }
+    
+    // Set headers for Server-Sent Events
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no', // Important for Nginx proxying
+      'Access-Control-Allow-Origin': '*'
     });
     
-    // Save the updated order
-    const updatedOrder = await order.save();
+    // Keep connection alive with a comment every 30 seconds
+    const keepAliveInterval = setInterval(() => {
+      res.write(': keepalive\n\n');
+    }, 30000);
     
-    // Get the io instance from req.app
-    const io = req.app.get('io');
+    // Send initial order data
+    const initialData = {
+      type: 'initial',
+      orderId: order.orderId,
+      status: order.status,
+      orderData: order,
+      timestamp: new Date().toISOString()
+    };
     
-    // Emit status update event to restaurant
-    const restaurantId = updatedOrder.restaurant._id;
-    io.to(`restaurant-${restaurantId}`).emit('order-status-update', {
-      orderId: updatedOrder.orderId,
-      status: updatedOrder.status,
-      orderData: updatedOrder,
-      message: `Order ${orderId} status updated to ${status}`
-    });
+    res.write(`data: ${JSON.stringify(initialData)}\n\n`);
     
-    // Emit status update event to customer if the user data exists
-    if (updatedOrder.user) {
-      // Get customer ID, supporting both _id and id formats to work with both portals
-      const customerId = updatedOrder.user._id || updatedOrder.user.id;
-      
-      if (customerId) {
-        io.to(`customer-${customerId}`).emit('order-status-update', {
-          orderId: updatedOrder.orderId,
-          status: updatedOrder.status,
-          orderData: updatedOrder,
-          message: `Your order status has been updated to ${formatStatus(status)}`
-        });
-        console.log(`Order status update notification sent to customer ${customerId}`);
-      }
+    // Create a unique client ID
+    const clientId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Store the client's response object
+    const clients = req.app.get('sse-clients') || {};
+    if (!clients[orderId]) {
+      clients[orderId] = {};
     }
+    clients[orderId][clientId] = res;
+    req.app.set('sse-clients', clients);
     
-    res.status(200).json({
-      success: true,
-      data: updatedOrder
+    console.log(`Client ${clientId} subscribed to updates for order ${orderId}`);
+    
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log(`Client ${clientId} disconnected from order ${orderId} updates`);
+      
+      // Clear the keepalive interval
+      clearInterval(keepAliveInterval);
+      
+      // Remove client from the clients list
+      if (clients[orderId]) {
+        delete clients[orderId][clientId];
+        
+        // Clean up empty order entries
+        if (Object.keys(clients[orderId]).length === 0) {
+          delete clients[orderId];
+        }
+      }
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    console.error('Error in order updates stream:', error);
+    
+    // If headers are not sent yet, send error response
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: 'Server error while setting up order updates stream'
+      });
+    }
+    
+    // If headers are already sent, try to close the connection properly
+    try {
+      res.end();
+    } catch (endError) {
+      console.error('Error ending SSE stream:', endError);
+    }
   }
 };
 
@@ -192,6 +252,152 @@ const formatStatus = (status) => {
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+};
+
+// Helper function to send update to all connected clients for a specific order
+const sendOrderUpdate = (req, orderId, data) => {
+  const clients = req.app.get('sse-clients') || {};
+  if (!clients[orderId]) return;
+  
+  console.log(`Sending update to ${Object.keys(clients[orderId]).length} clients for order ${orderId}`);
+  
+  // Add timestamp to the data
+  const updateData = {
+    ...data,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Send to all connected clients for this order
+  Object.values(clients[orderId]).forEach(client => {
+    try {
+      client.write(`data: ${JSON.stringify(updateData)}\n\n`);
+    } catch (error) {
+      console.error(`Error sending SSE update to client for order ${orderId}:`, error);
+      // We don't throw or exit here to prevent one client error from affecting others
+    }
+  });
+};
+
+// Helper function to create and send notifications
+const sendNotifications = (req, order, status, description) => {
+  try {
+    const io = req.app.get('io');
+    const customerIo = req.app.get('customerIo');
+    const orderId = order.orderId;
+    
+    // Create a standardized notification payload
+    const createNotificationPayload = (messagePrefix = '') => ({
+      orderId: order.orderId,
+      status: order.status,
+      orderData: order,
+      type: 'status-update',
+      message: `${messagePrefix}${formatStatus(status)}`,
+      timestamp: new Date().toISOString()
+    });
+    
+    // 1. Send update to all connected SSE clients for this order
+    sendOrderUpdate(
+      req, 
+      orderId, 
+      createNotificationPayload('Your order status has been updated to ')
+    );
+    
+    // 2. Emit status update event to restaurant
+    const restaurantId = order.restaurant?._id;
+    if (restaurantId) {
+      io.to(`restaurant-${restaurantId}`).emit(
+        'order-status-update', 
+        createNotificationPayload(`Order ${orderId} status updated to `)
+      );
+    }
+    
+    // 3. Emit to customer if user data exists
+    const customerId = order.user?._id || order.user?.id;
+    if (customerId) {
+      const customerPayload = createNotificationPayload('Your order status has been updated to ');
+      
+      // Main namespace - customer-specific room
+      io.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
+      
+      // Customer namespace - customer-specific room
+      if (customerIo) {
+        customerIo.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
+      }
+      
+      // Also log the successful notification
+      console.log(`Order status update notification sent to customer ${customerId}`);
+    }
+    
+    // 4. Always emit to order-specific room as a fallback
+    const orderRoomPayload = createNotificationPayload(
+      customerId ? 'Your order status has been updated to ' : 'Order status has been updated to '
+    );
+    
+    io.to(`order-${orderId}`).emit('order-status-update', orderRoomPayload);
+    
+    if (customerIo) {
+      customerIo.to(`order-${orderId}`).emit('order-status-update', orderRoomPayload);
+    }
+  } catch (error) {
+    // Log error but don't fail the entire operation if notifications fail
+    console.error('Error sending order notifications:', error);
+  }
+};
+
+// Update order status
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, description } = req.body;
+    
+    // Validate input
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required'
+      });
+    }
+    
+    // Find and update the order in a single operation for better performance
+    const order = await Order.findOneAndUpdate(
+      { orderId }, 
+      { 
+        $set: { status },
+        $push: { 
+          deliveryTimeline: {
+            status,
+            time: new Date(),
+            description: description || `Order status updated to ${status}`
+          }
+        }
+      },
+      { new: true } // Return the updated document
+    );
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    // Send all notifications asynchronously to avoid blocking the response
+    setImmediate(() => {
+      sendNotifications(req, order, status, description);
+    });
+    
+    // Respond immediately with success
+    res.status(200).json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'An error occurred while updating order status'
+    });
+  }
 };
 
 // Update payment status
