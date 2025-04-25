@@ -75,6 +75,28 @@ const NotificationBell: React.FC = () => {
     return 'Just now';
   };
 
+  // Get status color based on order status
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'order-received':
+        return 'text-yellow-600 dark:text-yellow-400';
+      case 'preparing-your-order':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'wrapping-up':
+        return 'text-indigo-600 dark:text-indigo-400';
+      case 'picking-up':
+        return 'text-purple-600 dark:text-purple-400';
+      case 'heading-your-way':
+        return 'text-orange-600 dark:text-orange-400';
+      case 'delivered':
+        return 'text-green-600 dark:text-green-400';
+      case 'cancelled':
+        return 'text-red-600 dark:text-red-400';
+      default:
+        return 'text-gray-600 dark:text-gray-400';
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -91,7 +113,7 @@ const NotificationBell: React.FC = () => {
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-20 overflow-hidden dark:bg-gray-800">
+        <div className="absolute right-0 mt-2 w-96 bg-white rounded-md shadow-lg z-20 overflow-hidden dark:bg-gray-800">
           <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <h3 className="font-semibold text-gray-700 dark:text-gray-200">
               Notifications
@@ -119,18 +141,46 @@ const NotificationBell: React.FC = () => {
                 <div 
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer dark:border-gray-700 dark:hover:bg-gray-700 ${
+                  className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer dark:border-gray-700 dark:hover:bg-gray-700 ${
                     !notification.read ? 'bg-blue-50 dark:bg-blue-900/10' : ''
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <p className={`text-sm ${notification.read ? 'text-gray-600 dark:text-gray-400' : 'font-medium text-gray-800 dark:text-white'}`}>
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        {formatTime(notification.timestamp)}
-                      </p>
+                      {notification.type === 'order-status-update' && notification.data && (
+                        <>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                            {notification.data.restaurantName}
+                          </p>
+                          <p className={`text-sm ${getStatusColor(notification.data.status)}`}>
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center mt-2 space-x-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatTime(notification.timestamp)}
+                            </span>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/orders/${notification.orderId}`);
+                              }}
+                              className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              View Details →
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      {notification.type !== 'order-status-update' && (
+                        <>
+                          <p className={`text-sm ${notification.read ? 'text-gray-600 dark:text-gray-400' : 'font-medium text-gray-800 dark:text-white'}`}>
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {formatTime(notification.timestamp)}
+                          </p>
+                        </>
+                      )}
                     </div>
                     {!notification.read && (
                       <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
