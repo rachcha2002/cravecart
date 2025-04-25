@@ -1,439 +1,455 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Linking, Alert } from 'react-native'; // Added Linking and Alert
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { FontAwesome5 } from '@expo/vector-icons';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  Linking,
+  Platform,
+  ActivityIndicator, // Import ActivityIndicator
+  Dimensions, // Import Dimensions
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons'; // Assuming Ionicons is installed
 
-// Define the Order type (optional but recommended for type safety)
+// Define the structure for Restaurant, User, Item, Address, Timeline
+// Adjust these based on your actual data models
+interface Restaurant {
+  _id: string;
+  name: string;
+  address: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+interface User {
+  _id: string;
+  name: string;
+  // Add other relevant user fields if needed
+}
+
+interface Item {
+  _id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+interface DeliveryAddress {
+  street: string;
+  city: string;
+  postalCode: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface TimelineEvent {
+  status: OrderStatus;
+  time: Date;
+  description?: string;
+}
+
+// Define possible order statuses
+type OrderStatus = 'pending' | 'accepted' | 'ready_for_pickup' | 'picked_up' | 'on_the_way' | 'delivered' | 'cancelled';
+
+// Define the main Order type
 type Order = {
-  id: string;
-  // Add 'picked_up' status
-  status: 'ready' | 'on_way' | 'picked_up' | 'delivered' | string; // Allow other statuses too
-  restaurant: string;
-  restaurantLocation: {
-    type: 'Point';
-    coordinates: [number, number]; // [lng, lat]
+  _id: string;
+  status: OrderStatus;
+  restaurant: Restaurant;
+  user: User;
+  items: Item[];
+  paymentStatus: 'pending' | 'paid' | 'failed'; // Example payment statuses
+  subtotal: number;
+  deliveryFee: number;
+  tax: number;
+  total: number;
+  paymentMethod: string; // Example: 'card', 'cash'
+  deliveryAddress: DeliveryAddress;
+  deliveryInstructions?: string; // Optional
+  deliveryTimeline: TimelineEvent[];
+  estimatedDeliveryTime?: Date; // Optional
+  driver?: { // Optional, might be assigned later
+    _id: string;
+    name: string;
   };
-  deliveryAddress: string;
-  deliveryLocation: {
-    type: 'Point';
-    coordinates: [number, number];
+  driverCurrentLocation?: { // Optional
+    latitude: number;
+    longitude: number;
   };
-  items: number;
-  amount: number;
-  paymentStatus: string;
-  driverId: string | null;
-  customerId: string;
-  createdAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
-// Initial data (can be moved outside the component if static)
-const initialOrders: Order[] = [
-  {
-    id: 'ORD123456',
-    status: 'ready',
-    restaurant: 'Spice Garden',
-    restaurantLocation: {
-      type: 'Point',
-      coordinates: [79.9707392, 6.9146775] // [lng, lat]
-    },
-    deliveryAddress: '123 Main St, City',
-    deliveryLocation: {
-      type: 'Point',
-      coordinates: [79.9724578, 6.9182443]
-    },
-    items: 2,
-    amount: 450,
-    paymentStatus: 'paid',
-    driverId: null,
-    customerId: 'CUS1001',
-    createdAt: '2025-04-19T18:30:00Z'
-  },
-  {
-    id: 'ORD123458',
-    status: 'delivered',
-    restaurant: 'Biryani House',
-    restaurantLocation: {
-      type: 'Point',
-      coordinates: [79.8589, 6.9197]
-    },
-    deliveryAddress: '789 Lake View',
-    deliveryLocation: {
-      type: 'Point',
-      coordinates: [79.8631, 6.9183]
-    },
-    items: 1,
-    amount: 350,
-    paymentStatus: 'paid',
-    driverId: 'DRV001',
-    customerId: 'CUS1003',
-    createdAt: '2025-04-19T17:40:00Z'
-  }
-  // Add more orders as needed
-];
 
-
-export default function Orders() {
-  const [activeTab, setActiveTab] = useState('active');
-  const [ordersData, setOrdersData] = useState<Order[]>(initialOrders); // Use state for orders
-  // State to track the expanded order ID
+export default function OrdersScreen() {
+  const [ordersData, setOrdersData] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'Current' | 'Past'>('Current');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // --- Helper Functions for Styling/Text (Keep as they are) ---
-  const getStatusColor = (status: string) => {
-    // ...existing code...
-    switch (status) {
-      case 'ready':
-        return styles.readyStatus;
-      case 'on_way':
-        return styles.onWayStatus;
-      // Add case for picked_up
-      case 'picked_up':
-        return styles.pickedUpStatus; // Add new style
-      case 'delivered':
-        return styles.deliveredStatus;
-      default:
-        return styles.defaultStatus;
-    }
-  };
+  // --- Data Fetching ---
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // TODO: Replace with your actual API endpoint and authentication
+        // Example: const token = await AsyncStorage.getItem('userToken');
+        const response = await fetch('http://localhost:3004/api/orders'); // Replace with your API
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        let data = await response.json();
 
-  const getStatusTextStyle = (status: string) => {
-    // ...existing code...
-    switch (status) {
-      case 'ready':
-        return styles.readyStatusText;
-      case 'on_way':
-        return styles.onWayStatusText; // Added missing return
-      // Add case for picked_up
-      case 'picked_up':
-        return styles.pickedUpStatusText; // Add new style
-      case 'delivered':
-        return styles.deliveredStatusText; // Added missing return
-      default:
-        return styles.defaultStatusText;
-    }
-  };
+        // Ensure date fields are parsed correctly
+        data = data.map((order: any) => ({
+            ...order,
+            createdAt: new Date(order.createdAt),
+            updatedAt: new Date(order.updatedAt),
+            estimatedDeliveryTime: order.estimatedDeliveryTime ? new Date(order.estimatedDeliveryTime) : undefined,
+            deliveryTimeline: order.deliveryTimeline.map((event: any) => ({
+                ...event,
+                time: new Date(event.time)
+            }))
+        }));
 
-  // Refined getStatusText to ensure it always returns a string
-  const getStatusText = (status: string | null | undefined): string => {
-    switch (status) {
-      case 'ready':
-        return 'Pickup Ready';
-      case 'on_way':
-        return 'On the way';
-      // Add case for picked_up
-      case 'picked_up':
-        return 'Picked Up';
-      case 'delivered':
-        return 'Delivered';
-      default:
-        // Handle potential null/undefined or empty string status
-        return typeof status === 'string' && status ? status : 'Unknown';
-    }
-  };
-  // --- End Helper Functions ---
-
-  // Function to open map link
-  const openMapLink = async (coordinates: [number, number], locationType: 'restaurant' | 'delivery') => {
-    const [lng, lat] = coordinates;
-    const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    try {
-      const supported = await Linking.canOpenURL(mapUrl);
-      if (supported) {
-        await Linking.openURL(mapUrl);
-      } else {
-        Alert.alert("Navigation Error", `Cannot open this URL: ${mapUrl}`);
+        setOrdersData(data);
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+        setError(errorMessage);
+        console.error("Failed to fetch orders:", e);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error(`Error opening map URL for ${locationType}:`, error);
-      Alert.alert(
-        "Navigation Error",
-        `Could not open Google Maps for ${locationType}. Please ensure it is installed or try again.`
-      );
+    };
+
+    fetchOrders();
+    // TODO: Add dependencies if needed (e.g., user ID)
+  }, []);
+
+  // --- Helper Functions ---
+  const openMapLink = (latitude: number, longitude: number, locationType: 'restaurant' | 'customer') => {
+    const label = locationType === 'restaurant' ? 'Restaurant Location' : 'Delivery Address';
+    const scheme = Platform.OS === 'ios' ? 'maps://0,0?q=' : 'geo:0,0?q=';
+    const latLng = `${latitude},${longitude}`;
+    const url = Platform.OS === 'ios' ? `${scheme}${label}@${latLng}` : `${scheme}${latLng}(${label})`;
+
+    Linking.openURL(url).catch(err => {
+        console.error('An error occurred opening map link', err);
+        setError('Could not open map application.'); // Inform user
+    });
+  };
+
+  const getStatusColor = (status: OrderStatus): string => {
+    switch (status) {
+      case 'pending': return '#FFA500'; // Orange
+      case 'accepted': return '#1E90FF'; // DodgerBlue
+      case 'ready_for_pickup': return '#FFD700'; // Gold
+      case 'picked_up': return '#32CD32'; // LimeGreen
+      case 'on_the_way': return '#1E90FF'; // DodgerBlue
+      case 'delivered': return '#008000'; // Green
+      case 'cancelled': return '#FF0000'; // Red
+      default: return '#808080'; // Gray
     }
   };
 
-  // Function to handle accepting an order
-  const handleAcceptOrder = async (orderToAccept: Order) => {
-    console.log(`Accepting order: ${orderToAccept.id}`);
-
-    // TODO: Add API call here to update status to 'on_way' on the server
-    // try {
-    //   await api.updateOrderStatus(orderToAccept.id, 'on_way');
-    // } catch (error) { ... }
-
-    // Update local state ONLY
-    setOrdersData(currentOrders =>
-      currentOrders.map(order =>
-        order.id === orderToAccept.id
-          ? { ...order, status: 'on_way' } // Update status locally
-          : order
-      )
-    );
-    // Removed map opening from here
+  const getStatusText = (status: OrderStatus): string => {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // Function to handle picking up an order
-  const handlePickupOrder = async (orderToPickup: Order) => {
-    console.log(`Picking up order: ${orderToPickup.id}`);
-
-    // TODO: Add API call here to update status to 'picked_up' on the server
-    // try {
-    //   await api.updateOrderStatus(orderToPickup.id, 'picked_up');
-    // } catch (error) { ... }
-
-    // Update local state
-    setOrdersData(currentOrders =>
-      currentOrders.map(order =>
-        order.id === orderToPickup.id
-          ? { ...order, status: 'picked_up' } // Update status locally
-          : order
-      )
-    );
-  };
-
-  // Function to handle completing an order
-  const handleCompleteOrder = async (orderToComplete: Order) => {
-    console.log(`Completing order: ${orderToComplete.id}`);
-
-    // TODO: Add API call here to update status to 'delivered' on the server
-    // try {
-    //   await api.updateOrderStatus(orderToComplete.id, 'delivered');
-    // } catch (error) { ... }
-
-    // Update local state
-    setOrdersData(currentOrders =>
-      currentOrders.map(order =>
-        order.id === orderToComplete.id
-          ? { ...order, status: 'delivered' } // Update status locally
-          : order
-      )
-    );
-  };
-
-  // Function to toggle expanded details view for past orders
   const handleToggleDetails = (orderId: string) => {
-    setExpandedOrderId(currentExpandedId =>
-      currentExpandedId === orderId ? null : orderId // Toggle: collapse if same, else expand
-    );
+    setExpandedOrderId(prevId => (prevId === orderId ? null : orderId));
   };
 
-  // Modified to accept the full order object and return appropriate buttons
+  // --- Action Handlers (API Calls) ---
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
+      console.log(`Updating order ${orderId} to status ${newStatus}`);
+      setError(null); // Clear previous errors
+      try {
+          // TODO: Replace with your actual API endpoint, method, and authentication
+          const response = await fetch(`http://localhost:3004/api/orders/${orderId}/status`, { // Example endpoint
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+                  // 'Authorization': `Bearer ${your_token}` // Add auth if needed
+              },
+              body: JSON.stringify({ status: newStatus, driverId: driverId }), // Send new status and potentially driverId
+          });
+
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.message || `Failed to update order status: ${response.statusText}`);
+          }
+
+          const updatedOrder = await response.json();
+
+          // Update local state
+          setOrdersData(prevOrders =>
+              prevOrders.map(order =>
+                  order._id === orderId ? {
+                      ...order,
+                      status: updatedOrder.status, // Use status from response
+                      driver: updatedOrder.driver // Update driver info if returned
+                  } : order
+              )
+          );
+      } catch (e) {
+          const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+          console.error(`Error updating order ${orderId} to ${newStatus}:`, e);
+          setError(`Failed to update order: ${errorMessage}`); // Show error to user
+      }
+  };
+
+  // Specific handlers calling the generic update function
+  const handleAcceptOrder = (orderId: string) => {
+      // TODO: Get the current driver's ID
+      const currentDriverId = 'DRIVER_ID_123'; // Replace with actual driver ID logic
+      updateOrderStatus(orderId, 'accepted', currentDriverId);
+  };
+
+  const handlePickupOrder = (orderId: string) => {
+      updateOrderStatus(orderId, 'picked_up');
+  };
+
+  const handleCompleteOrder = (orderId: string) => {
+      updateOrderStatus(orderId, 'delivered');
+  };
+
+  // --- Render Action Buttons ---
   const getActionButton = (order: Order) => {
     switch (order.status) {
-      case 'ready':
+      case 'pending':
         return (
-          <TouchableOpacity
-            style={styles.acceptButton}
-            onPress={() => handleAcceptOrder(order)}
-          >
-            <Text style={styles.buttonText}>Accept</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleAcceptOrder(order._id)}>
+            <Text style={styles.actionButtonText}>Accept</Text>
           </TouchableOpacity>
         );
-      case 'on_way':
-        // Show both Pickup and Navigate (to restaurant) buttons
+      case 'accepted':
+         return (
+           <>
+             <TouchableOpacity style={styles.navigateButton} onPress={() => openMapLink(order.restaurant.location.latitude, order.restaurant.location.longitude, 'restaurant')}>
+               <Text style={styles.actionButtonText}>To Restaurant</Text>
+             </TouchableOpacity>
+             {/* Add Ready for Pickup button if applicable, or handle via status update */}
+           </>
+         );
+      case 'ready_for_pickup':
         return (
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              style={styles.pickupButton} // Add new style
-              onPress={() => handlePickupOrder(order)}
-            >
-              <Text style={styles.buttonText}>Pickup</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navigateButton}
-              onPress={() => openMapLink(order.restaurantLocation.coordinates, 'restaurant')}
-            >
-              <Text style={styles.buttonText}>Navigate</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handlePickupOrder(order._id)}>
+            <Text style={styles.actionButtonText}>Pick Up</Text>
+          </TouchableOpacity>
         );
       case 'picked_up':
-        // Show Navigate (to customer) and Complete buttons
         return (
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              style={styles.navigateButton} // Needs margin when next to complete
-              onPress={() => openMapLink(order.deliveryLocation.coordinates, 'delivery')}
-            >
-              <Text style={styles.buttonText}>Navigate</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.completeButton}
-              onPress={() => handleCompleteOrder(order)}
-            >
-              <Text style={styles.buttonText}>Complete</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      default: // Includes 'delivered' and any other status
-        return (
-          <TouchableOpacity
-            style={styles.viewButton}
-            // Update onPress to toggle details
-            onPress={() => handleToggleDetails(order.id)}>
-            {/* Text remains "View Details", button action changes */}
-            <Text style={styles.viewButtonText}>View Details</Text>
+          <TouchableOpacity style={styles.navigateButton} onPress={() => openMapLink(order.deliveryAddress.latitude, order.deliveryAddress.longitude, 'customer')}>
+            <Text style={styles.actionButtonText}>To Customer</Text>
           </TouchableOpacity>
         );
+      case 'on_the_way':
+        return (
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleCompleteOrder(order._id)}>
+            <Text style={styles.actionButtonText}>Complete</Text>
+          </TouchableOpacity>
+        );
+      case 'delivered':
+      case 'cancelled':
+        return null; // No action needed
+      default:
+        return null;
     }
   };
 
-  // Helper to format date/time
-  const formatDateTime = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString(); // Adjust formatting as needed
-    } catch (e) {
-      return dateString; // Fallback
-    }
-  };
+  // --- Filtering Logic ---
+  const filteredOrders = ordersData.filter(order => {
+      const isPast = order.status === 'delivered' || order.status === 'cancelled';
+      return activeTab === 'Past' ? isPast : !isPast;
+  });
 
+  // --- Render Component ---
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Orders</Text>
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'active' && styles.activeTab]}
-              onPress={() => setActiveTab('active')}>
-              <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>
-                Active Orders
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'past' && styles.activeTab]}
-              onPress={() => setActiveTab('past')}>
-              <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
-                Past Orders
-              </Text>
-            </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Orders</Text>
+      </View>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'Current' ? styles.activeTab : {}]}
+          onPress={() => setActiveTab('Current')}
+        >
+          <Text style={[styles.tabText, activeTab === 'Current' ? styles.activeTabText : {}]}>Current</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'Past' ? styles.activeTab : {}]}
+          onPress={() => setActiveTab('Past')}
+        >
+          <Text style={[styles.tabText, activeTab === 'Past' ? styles.activeTabText : {}]}>Past</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading && (
+          <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
           </View>
-        </View>
+      )}
+      {error && <Text style={styles.errorText}>Error: {error}</Text>}
 
-        {/* Orders List */}
-        <View style={styles.ordersList}>
-          {ordersData // Use state variable here
-            .filter(order => activeTab === 'active' ? order.status !== 'delivered' : order.status === 'delivered')
-            .map(order => (
-              <View key={order.id} style={styles.orderCard}>
-                <View style={styles.orderContent}>
-                  <View style={styles.orderHeader}>
-                    <Text style={styles.orderId}>#{order.id}</Text>
-                    <View style={[styles.statusBadge, getStatusColor(order.status)]}>
-                      {/* Ensure getStatusText result is used */}
-                      <Text style={[styles.statusText, getStatusTextStyle(order.status)]}>
-                        {getStatusText(order.status)}
-                      </Text>
+      {!loading && !error && (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContentContainer}>
+          {filteredOrders.length > 0 ? (
+              filteredOrders.map((order) => (
+                <TouchableOpacity key={order._id} style={styles.orderCard} onPress={() => handleToggleDetails(order._id)} activeOpacity={0.8}>
+                  <View style={styles.orderContent}>
+                    {/* Header: ID and Status */}
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderId}>Order #{order._id.substring(0, 6)}...</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+                        <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.restaurantInfo}>
-                    <FontAwesome5 name="store" size={16} color="#6B7280" />
-                    <Text style={styles.restaurantText}>{order.restaurant}</Text>
-                  </View>
-                  <View style={styles.addressInfo}>
-                    <FontAwesome5 name="map-marker-alt" size={16} color="#6B7280" />
-                    <Text style={styles.addressText}>{order.deliveryAddress}</Text>
-                  </View>
-                  <View style={styles.orderFooter}>
-                    {/* Explicitly wrap dynamic parts if needed, though usually not necessary for numbers */}
-                    <Text style={styles.orderDetails}>{order.items} items • Rs {order.amount}</Text>
-                    <View style={styles.actionButtonContainer}>
-                      {getActionButton(order)}
-                    </View>
-                  </View>
 
-                  {/* Conditionally render expanded details only for past orders */}
-                  {activeTab === 'past' && expandedOrderId === order.id && (
-                    <View style={styles.expandedDetails}>
-                      <Text style={styles.detailText}>Delivered: {formatDateTime(order.createdAt)}</Text>
-                      <Text style={styles.detailText}>Payment: <Text style={styles.paymentStatusText}>{order.paymentStatus}</Text></Text>
-                      {/* Add more details here if needed */}
+                    {/* Restaurant Info */}
+                    <View style={styles.infoRow}>
+                       <Ionicons name="restaurant-outline" size={16} color="#555" style={styles.icon} />
+                       <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.name}</Text>
                     </View>
-                  )}
-                </View>
-              </View>
-            ))}
-        </View>
-      </ScrollView>
+                    {/* Delivery Address Info */}
+                    <View style={styles.infoRow}>
+                       <Ionicons name="location-outline" size={16} color="#555" style={styles.icon} />
+                       <Text style={styles.infoText} numberOfLines={1}>{order.deliveryAddress.street}, {order.deliveryAddress.city}</Text>
+                    </View>
+
+                    {/* Footer: Total and Action Button */}
+                    <View style={styles.orderFooter}>
+                       <Text style={styles.totalText}>${order.total.toFixed(2)}</Text>
+                       <View style={styles.actionButtonContainer}>
+                          {getActionButton(order)}
+                       </View>
+                    </View>
+
+                    {/* Expanded Details */}
+                    {expandedOrderId === order._id && (
+                      <View style={styles.expandedDetails}>
+                        <Text style={styles.detailTitle}>Details</Text>
+                        <Text style={styles.detailText}>Restaurant: {order.restaurant.name} ({order.restaurant.address})</Text>
+                        <Text style={styles.detailText}>Customer: {order.user.name}</Text>
+                        <Text style={styles.detailText}>Deliver To: {order.deliveryAddress.street}, {order.deliveryAddress.city}, {order.deliveryAddress.postalCode}</Text>
+                        {order.deliveryInstructions && <Text style={styles.detailText}>Instructions: {order.deliveryInstructions}</Text>}
+                        <Text style={styles.detailText}>Payment: {order.paymentMethod} ({order.paymentStatus})</Text>
+                        <Text style={styles.detailText}>Created: {new Date(order.createdAt).toLocaleString()}</Text>
+
+                        <Text style={styles.detailTitle}>Items:</Text>
+                        {order.items.map(item => (
+                           <Text key={item._id} style={styles.detailText}> - {item.name} (x{item.quantity}) @ ${item.price.toFixed(2)}</Text>
+                        ))}
+                        <Text style={styles.detailText}>Subtotal: ${order.subtotal.toFixed(2)}</Text>
+                        <Text style={styles.detailText}>Delivery Fee: ${order.deliveryFee.toFixed(2)}</Text>
+                        <Text style={styles.detailText}>Tax: ${order.tax.toFixed(2)}</Text>
+                        <Text style={[styles.detailText, styles.boldText]}>Total: ${order.total.toFixed(2)}</Text>
+
+                        {/* Optionally show timeline */}
+                        {/* <Text style={styles.detailTitle}>Timeline:</Text>
+                        {order.deliveryTimeline.map((event, index) => (
+                           <Text key={index} style={styles.detailText}> - {getStatusText(event.status)} at {event.time.toLocaleTimeString()}</Text>
+                        ))} */}
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))
+          ) : (
+              <Text style={styles.noOrdersText}>No {activeTab.toLowerCase()} orders found.</Text>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
-// --- Styles (Keep as they are) ---
+// --- Styles ---
 const styles = StyleSheet.create({
-  // ...existing styles...
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f0f0f0', // Slightly off-white background
+  },
+  header: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600', // Semibold
+    color: '#333',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+  },
+  tab: {
+    flex: 1, // Make tabs take equal width
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent', // Default inactive border
+  },
+  activeTab: {
+    borderBottomColor: '#007AFF', // Active tab indicator color
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#888', // Inactive tab text color
+  },
+  activeTabText: {
+    color: '#007AFF', // Active tab text color
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+  scrollContentContainer: {
+    paddingBottom: 20, // Add padding at the bottom
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
+  loadingContainer: {
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+     padding: 20,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  activeTab: {
-    backgroundColor: '#f29f05',
-  },
-  tabText: {
+  errorText: {
+    color: 'red',
     textAlign: 'center',
-    fontWeight: '600',
-    color: '#6b7280',
+    margin: 20,
+    fontSize: 16,
   },
-  activeTabText: {
-    color: '#ffffff',
-  },
-  ordersList: {
-    padding: 16,
+  noOrdersText: {
+     textAlign: 'center',
+     marginTop: 50,
+     fontSize: 16,
+     color: '#888',
   },
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginBottom: 16,
-    // position: 'relative', // No longer needed for close button
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    borderRadius: 8,
+    marginVertical: 8,
+    marginHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   orderContent: {
-    padding: 16,
+    padding: 15,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -442,66 +458,33 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderId: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    color: '#333',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  readyStatus: {
-    backgroundColor: 'rgba(242, 159, 5, 0.1)',
-  },
-  onWayStatus: {
-    backgroundColor: '#fef3c7',
-  },
-  // Add picked_up status style
-  pickedUpStatus: {
-    backgroundColor: '#e0f2fe', // Light blue
-  },
-  deliveredStatus: {
-    backgroundColor: '#d1fae5',
-  },
-  defaultStatus: {
-    backgroundColor: '#f3f4f6',
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 12,
   },
   statusText: {
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
-  readyStatusText: {
-    color: '#f29f05',
-  },
-  onWayStatusText: {
-    color: '#d97706',
-  },
-  // Add picked_up status text style
-  pickedUpStatusText: {
-    color: '#0284c7', // Blue
-  },
-  deliveredStatusText: {
-    color: '#059669',
-  },
-  defaultStatusText: {
-    color: '#6b7280',
-  },
-  restaurantInfo: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
   },
-  restaurantText: {
-    marginLeft: 8,
-    color: '#374151',
+  icon: {
+    marginRight: 8,
   },
-  addressInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addressText: {
-    marginLeft: 8,
-    color: '#6b7280',
+  infoText: {
+    flex: 1, // Allow text to wrap or truncate
+    fontSize: 14,
+    color: '#555',
   },
   orderFooter: {
     flexDirection: 'row',
@@ -510,77 +493,56 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: '#f0f0f0', // Lighter border
   },
-  orderDetails: {
-    color: '#6b7280',
+  totalText: {
+     fontSize: 16,
+     fontWeight: 'bold',
+     color: '#333',
   },
-  acceptButton: {
-    backgroundColor: '#f29f05',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  actionButtonContainer: {
+     flexDirection: 'row',
+     alignItems: 'center',
+  },
+  actionButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 5,
+    marginLeft: 8,
   },
   navigateButton: {
-    backgroundColor: '#f29f05',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginRight: 8, // Ensure margin is present for spacing
+    backgroundColor: '#34C759', // Green for navigation
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 5,
+    marginLeft: 8,
   },
-  viewButton: {
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: '#ffffff',
+  actionButtonText: {
+    color: '#fff',
     fontWeight: '600',
+    fontSize: 13,
   },
-  viewButtonText: {
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-  // Container for action buttons to handle single or multiple buttons
-  actionButtonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  // Style for when multiple buttons are shown ('on_way' status)
-  buttonGroup: {
-    flexDirection: 'row',
-  },
-  // Add pickup button style (can be same as navigate/accept)
-  pickupButton: {
-    backgroundColor: '#3b82f6', // Blue color for pickup
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginRight: 8, // Add margin if buttons are side-by-side
-  },
-  // Add complete button style
-  completeButton: {
-    backgroundColor: '#10b981', // Green color for complete
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    // No margin needed if it's the last button in the group
-  },
-  // Style for the expanded details section
   expandedDetails: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 15,
+    paddingTop: 15,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: '#f0f0f0',
+  },
+  detailTitle: {
+     fontSize: 15,
+     fontWeight: '600',
+     color: '#333',
+     marginBottom: 8,
+     marginTop: 5,
   },
   detailText: {
     fontSize: 14,
-    color: '#374151',
+    color: '#555',
     marginBottom: 4,
+    lineHeight: 20, // Improve readability
   },
-  paymentStatusText: {
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
+  boldText: {
+      fontWeight: 'bold',
+  }
 });
