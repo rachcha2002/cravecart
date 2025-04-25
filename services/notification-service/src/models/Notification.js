@@ -38,6 +38,12 @@ const receiverSchema = new mongoose.Schema({
         type: String,
         default: null,
       },
+      readAt: Date,
+      delivered: {
+        type: Boolean,
+        default: false,
+      },
+      deliveredAt: Date,
     },
   ],
 });

@@ -4,6 +4,8 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useCallback,
+  useRef,
 } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
@@ -12,24 +14,30 @@ import { toast } from "react-hot-toast";
 // Define the notification type
 export interface Notification {
   id: string;
-  type: "order-status-update" | "info";
+  type: "order-status-update" | "info" | "IN_APP";
+  title?: string;
   message: string;
   timestamp: Date;
   orderId?: string;
   read: boolean;
   data?: any;
+  actionUrl?: string;
+  actionText?: string;
 }
 
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
   socket: Socket | null;
   clearNotifications: () => void;
   socketConnected: boolean;
   reconnectSocket: () => void;
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  addNotification: (
+    notification: Omit<Notification, "id" | "timestamp" | "read">
+  ) => void;
+  fetchUnreadNotifications: () => Promise<void>;
 }
 
 interface NotificationProviderProps {
@@ -50,10 +58,9 @@ export const useNotifications = () => {
   return context;
 };
 
-
 // Get socket.io server URL from environment variable or use a default
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5005";
-
+const NOTIFICATION_SERVICE_URL =
+  process.env.REACT_APP_NOTIFICATION_SERVICE_URL || "http://localhost:5005";
 
 // Provider component
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({
@@ -62,325 +69,478 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [socketConnected, setSocketConnected] = useState<boolean>(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const { user } = useAuth();
+
+  // Use a ref to track socket connection to prevent duplicate connections
+  const socketRef = useRef<Socket | null>(null);
+
+  // Use another ref to track if initial fetch has been done
+  const initialFetchDoneRef = useRef(false);
 
   // Calculate unread count
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  // Fetch unread notifications - memoized to prevent recreation on each render
+  const fetchUnreadNotifications = useCallback(async () => {
+    if (!user?.id) return;
+
+    // Add a debug log
+    console.log("fetchUnreadNotifications called for user:", user.id);
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No authentication token found");
+        return;
+      }
+
+      const response = await fetch(
+        `${NOTIFICATION_SERVICE_URL}/api/notifications/unread/${user.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch notifications: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        console.log("Received unread notifications:", data.data.length);
+
+        // Transform to our notification format
+        const fetchedNotifications = data.data.map((notif: any) => ({
+          id: notif._id,
+          type: notif.type || "info",
+          title: notif.title,
+          message: notif.message,
+          timestamp: new Date(notif.createdAt),
+          orderId: notif.orderId,
+          read: false,
+          data: notif.data,
+          actionUrl: notif.actionUrl,
+          actionText: notif.actionText,
+        }));
+
+        // Add these notifications to state
+        setNotifications((prev) => {
+          // Filter out duplicates by ID
+          const existingIds = prev.map((n) => n.id);
+          const newNotifs = fetchedNotifications.filter(
+            (n: Notification) => !existingIds.includes(n.id)
+          );
+
+          if (newNotifs.length > 0) {
+            console.log(`Adding ${newNotifs.length} new notifications`);
+            return [...newNotifs, ...prev];
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  }, [user?.id]); // Only re-create when user ID changes
 
   // Initialize socket connection
   useEffect(() => {
-    if (!user || !user.id) {
-      console.log("No user or user ID available for socket connection");
+    // Only initialize if user exists and no active connection is in progress
+    if (!user?.id || isConnecting || socketRef.current) {
       return;
     }
 
-    console.log("Attempting to connect to socket server at:", SOCKET_URL);
-    const socketInstance = io(SOCKET_URL, {
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-    });
+    console.log("Setting up socket connection for user:", user.id);
+    setIsConnecting(true);
 
-    setSocket(socketInstance);
+    // Get the appropriate namespace based on user role
+    const userRole = user.role || "CUSTOMER";
+    const namespace = userRole.toLowerCase().replace("_", "-");
+    const namespaceUrl = `${NOTIFICATION_SERVICE_URL}/${namespace}`;
 
-    socketInstance.on("connect", () => {
-      console.log("Connected to socket server successfully");
-
-      // Join customer-specific room
-      if (user.id) {
-        console.log("Joining customer room with ID:", user.id);
-        socketInstance.emit("join-customer", user.id);
-      }
-    });
-
-    socketInstance.on("connect_error", (err) => {
-      console.error("Socket connection error:", err);
-    });
-
-    socketInstance.on("reconnect_attempt", (attemptNumber) => {
-      console.log(`Socket reconnection attempt ${attemptNumber}`);
-    });
-
-    socketInstance.on("reconnect_failed", () => {
-      console.error("Socket reconnection failed");
-    });
-
-    // Listen for notifications
-    socketInstance.on("notification", (data) => {
-      console.log("Received notification:", data);
-      addNotification({
-        type: data.type || "info",
-        message: data.message,
-        orderId: data.orderId,
-        data: data.data,
+    try {
+      const socketInstance = io(namespaceUrl, {
+        auth: { userId: user.id },
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        transports: ["websocket", "polling"],
       });
-    });
 
-    // Cleanup on unmount
-    return () => {
-      console.log("Disconnecting socket");
-      socketInstance.disconnect();
-    };
-  }, [user]);
+      socketRef.current = socketInstance;
+      setSocket(socketInstance);
 
-  // Listen for order status update notifications
-  useEffect(() => {
-    if (!socket) return;
+      socketInstance.on("connect", () => {
+        console.log("Socket connected successfully:", socketInstance.id);
+        setSocketConnected(true);
+        setIsConnecting(false);
+        setIsPolling(false);
 
-    // Handle order status update notifications
-    socket.on("order-status-update", (data) => {
-      // Only add notification if the order is for this customer
-      if (data.orderData.user && data.orderData.user.id === user?.id) {
-        addNotification({
-          type: "order-status-update",
-          message:
-            data.message ||
-            `Order ${data.orderId} status updated to ${data.status}`,
-          orderId: data.orderId,
-          data: data.orderData,
+        // Join user-specific room
+        socketInstance.emit("join", { userId: user.id, userType: userRole });
+        console.log("Emitted join event with:", {
+          userId: user.id,
+          userType: userRole,
         });
+      });
 
-        // Show toast notification
-        toast.success(data.message || `Order status updated to ${data.status}`);
-      }
-    });
+      socketInstance.on("connect_error", (err) => {
+        console.error("Socket connection error:", err.message);
+        setSocketConnected(false);
+        setIsConnecting(false);
+        setIsPolling(true);
+      });
+
+      socketInstance.on("disconnect", () => {
+        console.log("Socket disconnected");
+        setSocketConnected(false);
+        setIsPolling(true);
+      });
+
+      socketInstance.on("reconnect_failed", () => {
+        console.error("Socket reconnection failed after max attempts");
+        setIsPolling(true);
+      });
+
+      // Listen for notifications
+      socketInstance.on("notification", (data) => {
+        console.log("Received notification via socket:", data);
+
+        const newNotification: Notification = {
+          id: data.id || Math.random().toString(36).substring(2, 9),
+          type: data.type || "info",
+          title: data.title,
+          message: data.message,
+          timestamp: new Date(),
+          orderId: data.orderId,
+          read: false,
+          data: data.data,
+          actionUrl: data.actionUrl,
+          actionText: data.actionText,
+        };
+
+        setNotifications((prev) => [newNotification, ...prev]);
+
+        // Show toast notification - Fixed: removed description property
+        toast.success(`${data.title || "New notification"}: ${data.message}`, {
+          duration: 5000,
+        });
+      });
+
+      // Handle order status updates
+      socketInstance.on("order-status-update", (data) => {
+        console.log("Received order status update:", data);
+
+        // Only add notification if the order is for this customer
+        if (data.orderData?.user && data.orderData.user.id === user.id) {
+          // Format the status for display
+          const formattedStatus = data.status
+            .split("-")
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+
+          // Create a more descriptive message based on the status
+          let message = `Order #${data.orderId} `;
+          switch (data.status) {
+            case "order-received":
+              message += "has been received by the restaurant";
+              break;
+            case "preparing-your-order":
+              message += "is being prepared";
+              break;
+            case "wrapping-up":
+              message += "is being wrapped up";
+              break;
+            case "picking-up":
+              message += "is being picked up by the delivery partner";
+              break;
+            case "heading-your-way":
+              message += "is on its way to you";
+              break;
+            case "delivered":
+              message += "has been delivered";
+              break;
+            case "cancelled":
+              message += "has been cancelled";
+              break;
+            default:
+              message += `status updated to ${formattedStatus}`;
+          }
+
+          // Add notification
+          const newNotification: Notification = {
+            id: Math.random().toString(36).substring(2, 9),
+            type: "order-status-update",
+            message,
+            timestamp: new Date(),
+            orderId: data.orderId,
+            read: false,
+            data: {
+              ...data.orderData,
+              formattedStatus,
+              timestamp: new Date(),
+              restaurantName:
+                data.orderData?.restaurant?.restaurantInfo?.restaurantName ||
+                "Restaurant",
+            },
+          };
+
+          setNotifications((prev) => [newNotification, ...prev]);
+
+          // Show toast notification
+          toast.success(message, {
+            duration: 5000,
+          });
+
+          // Dispatch an event for other components to listen to
+          window.dispatchEvent(
+            new CustomEvent("orderStatusUpdate", {
+              detail: {
+                orderId: data.orderId,
+                status: data.status,
+                formattedStatus,
+                data: data.orderData,
+              },
+            })
+          );
+        }
+      });
+
+      return () => {
+        console.log("Cleaning up socket connection");
+        socketInstance.disconnect();
+        setSocket(null);
+        socketRef.current = null;
+        setIsConnecting(false);
+      };
+    } catch (error) {
+      console.error("Error initializing socket:", error);
+      setIsConnecting(false);
+      setIsPolling(true);
+      socketRef.current = null;
+    }
+  }, [user]); // Include only user to prevent recreation on every render
+
+  // Add polling when socket is offline
+  useEffect(() => {
+    if (!isPolling || !user?.id) return;
+
+    console.log("Starting polling for notifications");
+
+    // Initial fetch
+    fetchUnreadNotifications();
+
+    // Set up polling interval
+    const intervalId = setInterval(() => {
+      console.log("Polling for notifications");
+      fetchUnreadNotifications();
+    }, 30000); // Poll every 30 seconds
 
     return () => {
-      socket.off("order-status-update");
+      console.log("Stopping notification polling");
+      clearInterval(intervalId);
     };
-  }, [socket, user]);
+  }, [isPolling, user?.id, fetchUnreadNotifications]);
 
+  // Fetch notifications on initial load, only once
+  useEffect(() => {
+    if (user?.id && !initialFetchDoneRef.current) {
+      console.log("Initial fetch of notifications");
+      fetchUnreadNotifications();
+      initialFetchDoneRef.current = true;
+    }
+  }, [user?.id, fetchUnreadNotifications]);
 
-  // Add a new notification
-  const addNotification = (
-    notification: Omit<Notification, "id" | "timestamp" | "read">
-  ) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: Math.random().toString(36).substring(2, 9),
-      timestamp: new Date(),
-      read: false,
-    };
+  // Add a new notification - memoized
+  const addNotification = useCallback(
+    (notification: Omit<Notification, "id" | "timestamp" | "read">) => {
+      const newNotification: Notification = {
+        ...notification,
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: new Date(),
+        read: false,
+      };
 
-    setNotifications((prev) => [newNotification, ...prev]);
-  };
+      setNotifications((prev) => [newNotification, ...prev]);
+    },
+    []
+  );
 
-  // Mark a notification as read
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
-  };
+  // Mark a notification as read - memoized
+  const markAsRead = useCallback(
+    async (id: string) => {
+      if (!user?.id) return;
 
-  // Mark all notifications as read
-  const markAllAsRead = () => {
+      console.log("Marking notification as read:", id);
+
+      // Update UI state immediately
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === id
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+
+      // Call API to persist the change
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.error("No authentication token found");
+          return;
+        }
+
+        const response = await fetch(
+          `${NOTIFICATION_SERVICE_URL}/api/notifications/read/${id}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              userType: user.role || "CUSTOMER",
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            "Failed to mark notification as read on server:",
+            response.status
+          );
+        }
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+      }
+    },
+    [user?.id]
+  );
+
+  // Mark all notifications as read - memoized
+  const markAllAsRead = useCallback(async () => {
+    if (!user?.id || notifications.length === 0) return;
+
+    console.log("Marking all notifications as read");
+
+    // Update UI state immediately
     setNotifications((prev) =>
       prev.map((notification) => ({ ...notification, read: true }))
     );
-  };
 
-  // Clear all notifications
-  const clearNotifications = () => {
-    setNotifications([]);
-  };
-
-  // Initialize socket connection
-  useEffect(() => {
-    // Only create socket if user is logged in
-    if (!user || !user.id) {
-      console.log('No user logged in, skipping socket connection');
-      return;
-    }
-
-    console.log('Creating socket connection to:', SOCKET_URL);
-
-    // Close any existing socket
-    if (socket) {
-      console.log('Closing existing socket');
-      socket.close();
-    }
-
-    // Create new socket with minimal options
-    const newSocket = io(SOCKET_URL);
-    console.log('Socket instance created');
-    
-    setSocket(newSocket);
-
-    // Set up event handlers
-    newSocket.on('connect', () => {
-      console.log('Socket connected, ID:', newSocket.id);
-      setSocketConnected(true);
-      
-      // Join customer-specific room
-      newSocket.emit('join-customer', user.id);
-      console.log('Sent join-customer event with ID:', user.id);
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('Socket disconnected');
-      setSocketConnected(false);
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-      setSocketConnected(false);
-    });
-
-    // Clean up on unmount
-    return () => {
-      console.log('Unmounting, disconnecting socket');
-      newSocket.disconnect();
-    };
-  }, [user?.id]); // Only recreate socket when user ID changes
-
-  // Listen for order status updates
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleOrderUpdate = (data: any) => {
-      console.log('Received order update:', data);
-      
-      // We need to check if this update is for the current user
-      const orderId = data.orderId;
-      const orderUserId = data.orderData?.user?.id;
-      const currentUserId = user?.id;
-      
-      // Only show notifications for this user's orders
-      if (orderUserId === currentUserId) {
-        console.log('Order update is for current user');
-        
-        // Format the status for display
-        const formattedStatus = data.status
-          .split('-')
-          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-
-        // Create a more descriptive message based on the status
-        let message = `Order #${orderId} `;
-        switch (data.status) {
-          case 'order-received':
-            message += 'has been received by the restaurant';
-            break;
-          case 'preparing-your-order':
-            message += 'is being prepared';
-            break;
-          case 'wrapping-up':
-            message += 'is being wrapped up';
-            break;
-          case 'picking-up':
-            message += 'is being picked up by the delivery partner';
-            break;
-          case 'heading-your-way':
-            message += 'is on its way to you';
-            break;
-          case 'delivered':
-            message += 'has been delivered';
-            break;
-          case 'cancelled':
-            message += 'has been cancelled';
-            break;
-          default:
-            message += `status updated to ${formattedStatus}`;
-        }
-        
-        // Add to notifications with enhanced data
-        addNotification({
-          type: 'order-status-update',
-          message,
-          orderId,
-          data: {
-            ...data.orderData,
-            formattedStatus,
-            timestamp: new Date(),
-            restaurantName: data.orderData?.restaurant?.restaurantInfo?.restaurantName || 'Restaurant'
-          }
-        });
-        
-        // Show toast with the same formatted message
-        toast.success(message, {
-          duration: 5000,
-          position: 'top-right'
-        });
-
-        // Dispatch an event for other components to listen to
-        window.dispatchEvent(new CustomEvent('orderStatusUpdate', { 
-          detail: { 
-            orderId,
-            status: data.status,
-            formattedStatus,
-            data: data.orderData
-          }
-        }));
-      } else {
-        console.log('Order update is NOT for current user', { orderUserId, currentUserId });
+    // Call API to persist the change
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No authentication token found");
+        return;
       }
-    };
 
-    // Add event listener
-    socket.on('order-status-update', handleOrderUpdate);
-    
-    // Remove event listener on cleanup
-    return () => {
-      socket.off('order-status-update', handleOrderUpdate);
-    };
-  }, [socket, user, addNotification]);
+      const response = await fetch(
+        `${NOTIFICATION_SERVICE_URL}/api/notifications/mark-all-read/${user.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            userType: user.role || "CUSTOMER",
+          }),
+        }
+      );
 
-  // Simple manual reconnect function
-  const reconnectSocket = () => {
-    if (!user || !user.id) return;
-    
-    console.log('Manually reconnecting socket');
-    
-    if (socket) {
-      socket.disconnect();
+      if (!response.ok) {
+        console.error(
+          "Failed to mark all notifications as read on server:",
+          response.status
+        );
+      }
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
     }
-    
+  }, [user?.id, notifications.length]);
+
+  // Clear all notifications - memoized
+  const clearNotifications = useCallback(() => {
+    console.log("Clearing all notifications");
+    setNotifications([]);
+  }, []);
+
+  // Manual reconnect function - memoized
+  const reconnectSocket = useCallback(() => {
+    if (!user || !user.id) return;
+
+    console.log("Manually reconnecting socket");
+
+    // Disconnect existing socket if any
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
     // Show reconnecting toast
-    toast.loading('Reconnecting to server...', { id: 'reconnect-toast' });
-    
+    toast.loading("Reconnecting to notification server...", {
+      id: "reconnect-toast",
+    });
+
     // Create new socket
-    const newSocket = io(SOCKET_URL);
+    const userRole = user.role || "CUSTOMER";
+    const namespace = userRole.toLowerCase().replace("_", "-");
+    const namespaceUrl = `${NOTIFICATION_SERVICE_URL}/${namespace}`;
+
+    const newSocket = io(namespaceUrl, {
+      auth: { userId: user.id },
+    });
+
+    socketRef.current = newSocket;
     setSocket(newSocket);
-    
+
     // Handle connection events
-    newSocket.on('connect', () => {
-      console.log('Socket reconnected');
+    newSocket.on("connect", () => {
+      console.log("Socket reconnected:", newSocket.id);
       setSocketConnected(true);
-      toast.success('Successfully reconnected!', { id: 'reconnect-success' });
-      toast.dismiss('reconnect-toast');
-      
-      // Join customer-specific room
-      newSocket.emit('join-customer', user.id);
+      toast.success("Successfully reconnected!", { id: "reconnect-toast" });
+
+      // Join user-specific room
+      newSocket.emit("join", { userId: user.id, userType: userRole });
+
+      // Fetch missed notifications
+      fetchUnreadNotifications();
     });
-    
-    newSocket.on('connect_error', (error) => {
-      console.error('Reconnection error:', error);
+
+    newSocket.on("connect_error", (error) => {
+      console.error("Reconnection error:", error.message);
       setSocketConnected(false);
-      toast.error('Failed to reconnect', { id: 'reconnect-error' });
-      toast.dismiss('reconnect-toast');
+      toast.error("Failed to reconnect", { id: "reconnect-toast" });
     });
-  };
+  }, [user, fetchUnreadNotifications]);
+
+  // Log when the component renders
+  console.log("NotificationProvider render, unreadCount:", unreadCount);
 
   return (
-
-   
-
-    <NotificationContext.Provider value={{
-      notifications,
-      unreadCount,
-      markAsRead,
-      markAllAsRead,
-      socket,
-      clearNotifications,
-      socketConnected,
-      reconnectSocket,
-      addNotification
-    }}>
-
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
+        markAsRead,
+        markAllAsRead,
+        socket,
+        clearNotifications,
+        socketConnected,
+        reconnectSocket,
+        addNotification,
+        fetchUnreadNotifications,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );
