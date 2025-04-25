@@ -48,6 +48,19 @@ router.post("/sendmail", sendMail);
 
 router.post("/senddirect", notificationController.sendDirectNotification);
 
+// Add these routes to your notification routes
+router.post(
+  "/read/:notificationId",
+  notificationController.markNotificationAsRead
+);
+
+router.get(
+  "/unread/count/:userId",
+  notificationController.getUnreadNotificationsCount
+);
+
+router.get("/unread/:userId", notificationController.getUnreadNotifications);
+
 // Get notifications by role
 router.get(
   "/role/:role",

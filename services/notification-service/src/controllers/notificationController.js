@@ -15,23 +15,52 @@ const logger = winston.createLogger({
 });
 
 // Socket.io instance
-let io;
+let io = {
+  customer: null,
+  restaurant: null,
+  admin: null,
+  delivery: null,
+};
 
 const setSocketIO = (socketIO) => {
   io = socketIO;
 };
 
 // In-app notification with minimal logging
-const sendInApp = async (userId, notification) => {
+const sendInApp = async (userId, notification, userType) => {
   try {
-    if (io) {
-      io.to(userId.toString()).emit("notification", notification);
-      return true;
+    logger.info(
+      `Attempting to send in-app notification to user ${userId} with type ${userType}`
+    );
+
+    // Convert userType to uppercase for consistent mapping
+    const upperUserType = userType ? userType.toUpperCase() : "ADMIN";
+
+    // Map user type to appropriate namespace
+    const userTypeMap = {
+      CUSTOMER: "customer",
+      RESTAURANT_OWNER: "restaurant",
+      ADMIN: "admin",
+      DELIVERY_PERSON: "delivery",
+    };
+
+    const namespace = userTypeMap[upperUserType];
+
+    if (!namespace) {
+      logger.error(
+        `Invalid user type: ${userType} (${upperUserType}). Cannot map to namespace.`,
+        {
+          originalUserType: userType,
+          upperUserType,
+          availableTypes: Object.keys(userTypeMap),
+        }
+      );
+      return false;
     }
-    return false;
+
+    // Rest of your function...
   } catch (error) {
-    logger.error("In-app notification failed:", error.message);
-    return false;
+    // Error handling...
   }
 };
 
@@ -107,6 +136,7 @@ const createNotification = async (req, res) => {
 
       const receiverData = {
         userId: user._id,
+        userType: user.role || "UNKNOWN", // Add the userType field
         receivingData: [],
       };
 
@@ -273,7 +303,11 @@ const createNotification = async (req, res) => {
                 actionUrl: actionUrl || null,
                 actionText: actionText || null,
               };
-              sent = await sendInApp(user._id, inAppNotification);
+              sent = await sendInApp(
+                user._id,
+                inAppNotification,
+                user.role || "ADMIN"
+              );
               break;
 
             default:
@@ -300,6 +334,7 @@ const createNotification = async (req, res) => {
         notification.receivers.push(receiverData);
         notificationResults.push({
           userId: user._id,
+          userType: user.role || "UNKNOWN", // Make sure to include userType here too
           channels: receiverData.receivingData,
         });
       }
@@ -455,6 +490,7 @@ const sendDirectNotification = async (req, res) => {
 
       const receiverData = {
         userId: user._id,
+        userType: user.role || "UNKNOWN", // Add the userType field
         receivingData: [],
       };
 
@@ -614,14 +650,22 @@ const sendDirectNotification = async (req, res) => {
               break;
 
             case "IN_APP":
-              // For in-app notifications, also pass the actionUrl and actionText if available
               const inAppNotification = {
                 title,
                 message,
                 actionUrl: actionUrl || null,
                 actionText: actionText || null,
               };
-              sent = await sendInApp(user._id, inAppNotification);
+
+              // Log the user role for debugging
+              logger.info(`User role before sending: ${user.role}`);
+
+              // Make sure to pass the role (even if lowercase, it will be converted)
+              sent = await sendInApp(
+                user._id,
+                inAppNotification,
+                user.role || "ADMIN"
+              );
               break;
 
             default:
@@ -648,6 +692,7 @@ const sendDirectNotification = async (req, res) => {
         notification.receivers.push(receiverData);
         notificationResults.push({
           userId: user._id,
+          userType: user.role || "UNKNOWN", // Make sure to include userType here too
           channels: receiverData.receivingData,
         });
       }
@@ -684,9 +729,246 @@ const sendDirectNotification = async (req, res) => {
   }
 };
 
+// Add this function to your notification controller
+const markNotificationAsRead = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const { userId, userType } = req.body;
+
+    if (!notificationId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: notificationId or userId",
+      });
+    }
+
+    // Find the notification with the specified user
+    const notification = await Notification.findOne({
+      _id: notificationId,
+      "receivers.userId": userId,
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        error: "Notification not found for this user",
+      });
+    }
+
+    // Update the read status for in-app notifications for this user
+    const result = await Notification.updateOne(
+      {
+        _id: notificationId,
+        "receivers.userId": userId,
+        "receivers.receivingData.channel": "IN_APP",
+      },
+      {
+        $set: {
+          "receivers.$.receivingData.$[elem].read": true,
+          "receivers.$.receivingData.$[elem].readAt": new Date(),
+        },
+      },
+      {
+        arrayFilters: [{ "elem.channel": "IN_APP" }],
+      }
+    );
+
+    // Check if the update was successful
+    if (result.modifiedCount > 0) {
+      const count = await Notification.countDocuments({
+        "receivers.userId": userId,
+        "receivers.receivingData": {
+          $elemMatch: {
+            channel: "IN_APP",
+            status: "SENT",
+            read: false,
+          },
+        },
+      });
+
+      if (io[userType.toLowerCase()]) {
+        io[userType.toLowerCase()]
+          .to(userId.toString())
+          .emit("unreadCount", { count });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Notification marked as read",
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Failed to mark notification as read",
+      });
+    }
+  } catch (error) {
+    logger.error("Failed to mark notification as read:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to mark notification as read",
+      details: error.message,
+    });
+  }
+};
+
+// Add this function to your notification controller
+// Add this function to your notification controller with enhanced error handling
+const getUnreadNotificationsCount = async (req, res) => {
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  const attemptFetchCount = async () => {
+    try {
+      const { userId } = req.params;
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required field: userId",
+        });
+      }
+
+      logger.info(`Fetching unread notifications count for user: ${userId}`);
+
+      // Count unread in-app notifications for this user
+      // Using a timeout promise to prevent hanging operations
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error("Database query timeout after 5 seconds")),
+          5000
+        );
+      });
+
+      const countPromise = Notification.countDocuments({
+        "receivers.userId": userId,
+        "receivers.receivingData": {
+          $elemMatch: {
+            channel: "IN_APP",
+            status: "SENT",
+            read: false,
+          },
+        },
+      });
+
+      // Race the promises to handle both results and timeout
+      const count = await Promise.race([countPromise, timeoutPromise]);
+
+      logger.info(`Found ${count} unread notifications for user: ${userId}`);
+
+      return res.status(200).json({
+        success: true,
+        count,
+      });
+    } catch (error) {
+      // Check if we should retry
+      if (
+        retryCount < maxRetries &&
+        (error.code === "ECONNRESET" ||
+          error.name === "MongoNetworkError" ||
+          error.message.includes("timeout"))
+      ) {
+        retryCount++;
+        const delay = retryCount * 500; // Progressive backoff: 500ms, 1000ms, 1500ms
+
+        logger.warn(
+          `Connection error in getUnreadNotificationsCount. Retrying (${retryCount}/${maxRetries}) after ${delay}ms`,
+          {
+            error: error.message,
+            code: error.code,
+            userId: req.params.userId,
+          }
+        );
+
+        return new Promise((resolve) => {
+          setTimeout(() => resolve(attemptFetchCount()), delay);
+        });
+      }
+
+      // If we're here, we've exhausted retries or hit a non-retriable error
+      logger.error(`Failed to get unread notifications count:`, {
+        error: error.message,
+        code: error.code,
+        stack: error.stack,
+        userId: req.params.userId,
+        retryAttempts: retryCount,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "Failed to get unread notifications count",
+        details: error.message,
+      });
+    }
+  };
+
+  return attemptFetchCount();
+};
+
+// Add this function to your notification controller
+const getUnreadNotifications = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 10, page = 1 } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: userId",
+      });
+    }
+
+    // Find unread in-app notifications for this user
+    const notifications = await Notification.find({
+      "receivers.userId": userId,
+      "receivers.receivingData": {
+        $elemMatch: {
+          channel: "IN_APP",
+          status: "SENT",
+          read: false,
+        },
+      },
+    })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Notification.countDocuments({
+      "receivers.userId": userId,
+      "receivers.receivingData": {
+        $elemMatch: {
+          channel: "IN_APP",
+          status: "SENT",
+          read: false,
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: notifications,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    logger.error("Failed to get unread notifications:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to get unread notifications",
+      details: error.message,
+    });
+  }
+};
+
 module.exports = {
   createNotification,
   getNotificationsByRole,
   sendDirectNotification,
+  markNotificationAsRead,
+  getUnreadNotificationsCount,
+  getUnreadNotifications,
   setSocketIO,
 };

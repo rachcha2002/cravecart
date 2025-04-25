@@ -6,6 +6,11 @@ const receiverSchema = new mongoose.Schema({
     required: true,
     ref: "User",
   },
+  userType: {
+    type: String,
+    enum: ["customer", "restaurant", "admin", "delivery"],
+    required: true,
+  },
   receivingData: [
     {
       channel: {
@@ -20,6 +25,18 @@ const receiverSchema = new mongoose.Schema({
       },
       sentAt: {
         type: Date,
+      },
+      read: {
+        type: Boolean,
+        default: false,
+      },
+      readAt: {
+        type: Date,
+        default: null,
+      },
+      error: {
+        type: String,
+        default: null,
       },
     },
   ],

@@ -922,7 +922,7 @@ const getUsersByRole = async (req, res) => {
     const users = await User.find({
       role: role.toLowerCase(),
       status: status.toLowerCase(),
-    }).select("_id email phoneNumber name");
+    }).select("_id email phoneNumber name role");
 
     res.status(200).json({
       success: true,
@@ -947,7 +947,9 @@ const getUserContactInfo = async (req, res) => {
     const { id } = req.params;
 
     // Find user and select only contact information
-    const user = await User.findById(id).select("email phoneNumber name _id");
+    const user = await User.findById(id).select(
+      "email phoneNumber name _id role"
+    );
 
     if (!user) {
       return res.status(404).json({

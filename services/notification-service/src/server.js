@@ -20,6 +20,103 @@ const io = new Server(httpServer, {
   },
 });
 
+// Create namespaces for different client types
+const customerIO = io.of("/customer");
+const restaurantIO = io.of("/restaurant");
+const adminIO = io.of("/admin");
+const deliveryIO = io.of("/delivery");
+
+// Handle customer connections
+customerIO.on("connection", (socket) => {
+  console.log("Customer client connected:", socket.id);
+
+  socket.on("join-customer", (userId) => {
+    socket.join(userId);
+    console.log(`Customer ${userId} joined room ${socket.id}`);
+    socket.emit("joined", {
+      userId,
+      message: "Successfully joined customer notification room",
+    });
+  });
+
+  // Listen for order status updates
+  socket.on("order-status-update", (data) => {
+    console.log("Received order status update:", data);
+    // Emit to specific customer
+    customerIO.to(data.userId).emit("notification", {
+      type: "order-status-update",
+      message: data.message,
+      orderId: data.orderId,
+      data: data.orderData,
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Customer client disconnected:", socket.id);
+  });
+});
+
+// Handle restaurant connections
+restaurantIO.on("connection", (socket) => {
+  console.log("Restaurant client connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    socket.join(userId);
+    console.log(`Restaurant ${userId} joined room ${socket.id}`);
+    socket.emit("joined", {
+      userId,
+      message: "Successfully joined restaurant notification room",
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Restaurant client disconnected:", socket.id);
+  });
+});
+
+// Handle admin connections
+adminIO.on("connection", (socket) => {
+  console.log("Admin client connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    socket.join(userId);
+    console.log(`Admin ${userId} joined room ${socket.id}`);
+    socket.emit("joined", {
+      userId,
+      message: "Successfully joined admin notification room",
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Admin client disconnected:", socket.id);
+  });
+});
+
+// Handle delivery connections
+deliveryIO.on("connection", (socket) => {
+  console.log("Delivery client connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    socket.join(userId);
+    console.log(`Delivery ${userId} joined room ${socket.id}`);
+    socket.emit("joined", {
+      userId,
+      message: "Successfully joined delivery notification room",
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Delivery client disconnected:", socket.id);
+  });
+});
+
+notificationController.setSocketIO({
+  customer: customerIO,
+  restaurant: restaurantIO,
+  admin: adminIO,
+  delivery: deliveryIO,
+});
+
 // Middleware
 app.use(helmet());
 app.use(cors());
