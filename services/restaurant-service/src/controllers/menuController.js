@@ -15,14 +15,16 @@ const handleError = (res, error) => {
 
 exports.createMenu = async (req, res) => {
   try {
-    const { restaurantId } = req.body;
+    const { restaurantId, categories } = req.body;
     
    // Verify the restaurant exists by calling the user-service API
-   const restaurant = await getUserById(restaurantId);
-   if (!restaurant) {
+   const response = await getUserById(restaurantId);
+   const restaurant = response.user ;
+
+   if (!restaurant || restaurant.role !== 'restaurant') {
      return res.status(404).json({
        success: false,
-       message: 'Restaurant not found',
+       message: 'Restaurant not found or not authorized',
      });
    }
     
@@ -35,7 +37,7 @@ exports.createMenu = async (req, res) => {
       });
     }
     
-    const menu = new Menu(req.body);
+    const menu = new Menu({ restaurantId, categories });
     const savedMenu = await menu.save();
     
     res.status(201).json({
@@ -59,12 +61,12 @@ exports.getMenuByRestaurantId = async (req, res) => {
   try {
     const { restaurantId } = req.params;
     
-    const menu = await Menu.findOne({ restaurantId, isActive: true });
+    const menu = await Menu.findOne({ restaurantId});
     
     if (!menu) {
       return res.status(404).json({
         success: false,
-        message: 'No active menu found for this restaurant'
+        message: 'No menu found for this restaurant'
       });
     }
     

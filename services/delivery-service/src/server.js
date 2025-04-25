@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
+const Delivery =require('./routes/delivery-routes'); // Assuming you have a Delivery model defined in models/Delivery.js
 
 // Load environment variables
 dotenv.config();
@@ -18,6 +19,8 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.use('/api/delivery', Delivery); // Use the delivery routes
 
 // Routes will be added here
 

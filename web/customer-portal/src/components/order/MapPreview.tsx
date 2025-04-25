@@ -5,11 +5,12 @@ interface MapPreviewProps {
   onLocationSelect: (lat: number, lng: number, address: string) => void;
 }
 
-// Define window with optional initMap property
+// Define window with optional initMap property and string indexing
 declare global {
   interface Window {
     google: any;
-    initMap?: () => void;  // Mark initMap as optional with ?
+    initMap?: () => void;
+    [key: string]: any;  // This allows string indexing on window
   }
 }
 
@@ -29,6 +30,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
   const [currentLocationSelected, setCurrentLocationSelected] = useState(false);
   const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
+  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false);
 
   // Check if viewport is mobile
   useEffect(() => {
@@ -55,17 +57,40 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
     }
   }, [userLocationFound]);
 
-  // Load Google Maps script
+  // Check if Google Maps is already loaded
   useEffect(() => {
-    if (!window.google) {
+    if (window.google && window.google.maps) {
+      setGoogleScriptLoaded(true);
+      setInitializing(false);
+      return;
+    }
+
+    // If script not already loaded by LocationSelector, load it here
+    // This creates a unique callback name to avoid conflicts
+    const callbackName: string = 'initMapCallback_' + Math.random().toString(36).substring(2, 9);
+    window[callbackName] = () => {
+      setGoogleScriptLoaded(true);
+      setInitializing(false);
+    };
+
+    // Check if script is already in the document
+    const existingScript = document.querySelector(`script[src*="maps.googleapis.com/maps/api"]`);
+    if (existingScript) {
+      // Script exists but may still be loading
+      if (window.google && window.google.maps) {
+        window[callbackName]();
+      } else {
+        // Wait for the existing script to load
+        existingScript.addEventListener('load', window[callbackName]);
+      }
+      return;
+    }
+
+    // Load Google Maps script if not already loading
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=${callbackName}`;
       script.async = true;
       script.defer = true;
-      
-      window.initMap = () => {
-        setInitializing(false);
-      };
       
       // Handle script load error
       script.onerror = () => {
@@ -76,25 +101,24 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
       document.head.appendChild(script);
       
       return () => {
-        document.head.removeChild(script);
-        // Safely remove the initMap property from window
-        if (window.initMap) {
-          window.initMap = undefined;
+      // Clean up the callback
+      if (window[callbackName]) {
+        delete window[callbackName];
         }
-      };
-    } else {
-      setInitializing(false);
-    }
+      
+      // Don't remove the script as it might be used by other components
+    };
   }, []);
 
   // Initialize map
   useEffect(() => {
-    if (!initializing && mapRef.current && !map && window.google) {
+    if (googleScriptLoaded && mapRef.current && !map) {
       try {
-        // A more neutral default center (0,0 is in the Atlantic Ocean)
-        // Using a moderate zoom level to show a wider area
-        let defaultCenter = { lat: 0, lng: 0 };
-        let defaultZoom = 2;
+        console.log("Initializing map...");
+        
+        // Default to central Sri Lanka if no user location
+        let defaultCenter = { lat: 7.8731, lng: 80.7718 }; // Sri Lanka center
+        let defaultZoom = 8;
         
         const newMap = new window.google.maps.Map(mapRef.current, {
           center: defaultCenter,
@@ -203,6 +227,28 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
         
         const newGeocoder = new window.google.maps.Geocoder();
         
+        // Set up marker drag event
+        newMarker.addListener('dragend', function() {
+          const position = newMarker.getPosition();
+          if (position) {
+            const lat = position.lat();
+            const lng = position.lng();
+            updateLocationAndUI(lat, lng);
+          }
+        });
+
+        // Set up map click event
+        newMap.addListener('click', function(e: any) {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          
+          // Update marker position
+          newMarker.setPosition(e.latLng);
+          
+          // Update location in UI and notify parent
+          updateLocationAndUI(lat, lng);
+        });
+        
         // Define a more robust update function that ensures UI updates
         const updateLocationAndUI = (lat: number, lng: number) => {
           console.log("updateLocationAndUI called with", lat, lng);
@@ -243,58 +289,22 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
               
               // Notify parent component
               onLocationSelect(lat, lng, formattedAddress);
+            } else {
+              console.error("Geocoding failed:", status);
               
-              // Direct DOM update for the address input field in the parent component
-              try {
-                const addressInput = document.querySelector('input[placeholder="Enter your delivery address"]') as HTMLInputElement;
-                if (addressInput) {
-                  addressInput.value = formattedAddress;
-                  
-                  // Create and dispatch events to trigger React state updates
-                  const changeEvent = new Event('change', { bubbles: true });
-                  addressInput.dispatchEvent(changeEvent);
-                  
-                  // Force blur to trigger save
-                  addressInput.blur();
-                }
-              } catch (e) {
-                console.error("Error with direct DOM update:", e);
-              }
+              // If geocoding fails, still notify with coordinates but use a placeholder address
+              onLocationSelect(lat, lng, `Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`);
             }
           });
         };
         
-        // Set up marker drag end event with the robust update function
-        window.google.maps.event.addListener(newMarker, 'dragend', () => {
-          const position = newMarker.getPosition();
-          console.log("Marker dragend event triggered", position.lat(), position.lng());
-          
-          // Use the robust update function
-          updateLocationAndUI(position.lat(), position.lng());
-        });
-        
-        // Also listen for drag events to update position in real-time
-        window.google.maps.event.addListener(newMarker, 'drag', () => {
-          const position = newMarker.getPosition();
-          // Update map center to follow marker while dragging
-          newMap.panTo(position);
-        });
-        
-        // Set up map click event with the robust update function
-        window.google.maps.event.addListener(newMap, 'click', (event: any) => {
-          newMarker.setPosition(event.latLng);
-          
-          // Use the robust update function
-          updateLocationAndUI(event.latLng.lat(), event.latLng.lng());
-        });
-        
-        // Initialize search box if search input is available
+        // Initialize search box if available
         if (searchBoxRef.current) {
-          const newSearchBox = new window.google.maps.places.SearchBox(searchBoxRef.current);
+          const searchBoxInstance = new window.google.maps.places.SearchBox(searchBoxRef.current);
           
-          // Listen for the event fired when the user selects a prediction
-          newSearchBox.addListener('places_changed', () => {
-            const places = newSearchBox.getPlaces();
+          // Listen for search box changes
+          searchBoxInstance.addListener('places_changed', function() {
+            const places = searchBoxInstance.getPlaces();
             
             if (places.length === 0) {
               return;
@@ -303,221 +313,140 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
             const place = places[0];
             
             if (!place.geometry || !place.geometry.location) {
-              console.log("Returned place contains no geometry");
+              console.error("No geometry found for this place");
               return;
             }
             
-            // If the place has a geometry, then center the map and set marker
-            if (place.geometry.viewport) {
-              newMap.fitBounds(place.geometry.viewport);
-            } else {
+            // Update map and marker
               newMap.setCenter(place.geometry.location);
-              newMap.setZoom(17);
-            }
-            
+            newMap.setZoom(15); // Zoom in when a place is selected
             newMarker.setPosition(place.geometry.location);
             
-            // Get formatted address and pass to parent component
-            if (place.formatted_address) {
-              onLocationSelect(
-                place.geometry.location.lat(),
-                place.geometry.location.lng(),
-                place.formatted_address
-              );
-            }
+            // Get coordinates
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            
+            // Notify parent
+            onLocationSelect(lat, lng, place.formatted_address || '');
           });
           
-          // Bias the SearchBox results towards current map's viewport
-          newMap.addListener('bounds_changed', () => {
-            newSearchBox.setBounds(newMap.getBounds());
-          });
-          
-          setSearchBox(newSearchBox);
+          setSearchBox(searchBoxInstance);
         }
         
+        // Set states
         setMap(newMap);
         setMarker(newMarker);
         setGeocoder(newGeocoder);
         
-        // If an address is provided, geocode it
-        if (address && address.trim() !== '') {
+        // If we already have an address, try to center the map on it
+        if (address) {
           geocodeAddress(address, newGeocoder, newMap, newMarker);
         }
         
-        // Prioritize getting user location
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const pos = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-              };
-              
-              newMap.setCenter(pos);
-              newMap.setZoom(isMobile ? 16 : 15); // Closer zoom on mobile
-              newMarker.setPosition(pos);
-              
-              // Always reverse geocode and automatically select the location
-              if (!currentLocationSelected) {
-                reverseGeocode(pos.lat, pos.lng);
-                setCurrentLocationSelected(true);
-              }
-              
-              setUserLocationFound(true);
-            },
-            (error) => {
-              console.log("Geolocation failed:", error);
-              // If we have an address but no user location, try to geocode the address
-              if (address && address.trim() !== '') {
-                geocodeAddress(address, newGeocoder, newMap, newMarker);
-              } else {
-                // If IP geolocation is available, we could use that here
-                console.log("Using default world view");
-              }
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-          );
-        }
+        console.log("Map initialized successfully");
       } catch (err) {
         console.error("Error initializing map:", err);
-        setError('An error occurred while initializing the map. Please refresh the page.');
+        setError("There was a problem initializing the map. Please try refreshing the page.");
       }
     }
-  }, [initializing, map, address, onLocationSelect, userLocationFound, isMobile, currentLocationSelected]);
+  }, [googleScriptLoaded, mapRef.current]);
 
-  // Geocode address to coordinates
+  // Update map when address changes
+  useEffect(() => {
+    if (map && geocoder && marker && address && !isUpdatingAddress) {
+      geocodeAddress(address, geocoder, map, marker);
+    }
+  }, [address, map, geocoder, marker]);
+
+  // Geocode an address and update the map
   const geocodeAddress = (
     address: string, 
     geocoder: any, 
     map: any, 
     marker: any
   ) => {
+    if (!address) return;
+    
+    setIsUpdatingAddress(true);
+    
     geocoder.geocode({ address }, (results: any, status: any) => {
       if (status === 'OK' && results[0]) {
         const location = results[0].geometry.location;
+        
         map.setCenter(location);
-        map.setZoom(isMobile ? 16 : 15); // Closer zoom when we have a specific address, even closer on mobile
+        map.setZoom(15); // Zoom in to show the area clearly
         marker.setPosition(location);
+        
+        // Notify parent component (disabled to prevent feedback loop)
+        // onLocationSelect(location.lat(), location.lng(), results[0].formatted_address);
       } else {
-        console.warn(`Geocode was not successful for the following reason: ${status}`);
+        console.error("Geocoding failed:", status);
       }
+      
+      setIsUpdatingAddress(false);
     });
   };
 
-  // Reverse geocode coordinates to address
+  // Helper function to reverse geocode
   const reverseGeocode = (lat: number, lng: number) => {
-    if (geocoder) {
-      const latlng = { lat, lng };
+    if (!geocoder) return;
       
-      setIsUpdatingAddress(true);
-      console.log("Starting reverse geocoding for:", lat, lng);
-      
-      geocoder.geocode({ location: latlng }, (results: any, status: any) => {
+    geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
         if (status === 'OK' && results[0]) {
           const formattedAddress = results[0].formatted_address;
-          console.log("Geocoding success:", formattedAddress);
           
-          // Always update the search box with the new address when available
+        // Update the search box if available
           if (searchBoxRef.current) {
             searchBoxRef.current.value = formattedAddress;
           }
           
-          // Notify parent component about the new location
-          // Explicit callback with new coordinates and address
-          try {
+        // Notify parent component
             onLocationSelect(lat, lng, formattedAddress);
-            console.log("Location select callback executed with:", formattedAddress);
-          } catch (err) {
-            console.error("Error in location select callback:", err);
-          }
-        } else {
-          console.warn(`Reverse geocode was not successful for the following reason: ${status}`);
-          // Still provide coordinates even if we can't get an address
-          const fallbackAddress = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          if (searchBoxRef.current) {
-            searchBoxRef.current.value = fallbackAddress;
-          }
-          
-          try {
-            onLocationSelect(lat, lng, fallbackAddress);
-            console.log("Location select callback executed with fallback:", fallbackAddress);
-          } catch (err) {
-            console.error("Error in location select callback with fallback:", err);
-          }
-        }
-        
-        setIsUpdatingAddress(false);
-      });
-    } else {
-      console.error("Geocoder not initialized");
-    }
+      }
+    });
   };
 
-  // Update marker position when address changes
-  useEffect(() => {
-    if (geocoder && map && marker && address && address.trim() !== '') {
-      geocodeAddress(address, geocoder, map, marker);
-    }
-  }, [address, geocoder, map, marker, isMobile]);
+  // Display error message if initialization fails
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-gray-100 dark:bg-gray-800 p-4 rounded-md">
+        <div className="text-red-500 font-medium mb-2">Error: {error}</div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          Refresh Page
+        </button>
+      </div>
+    );
+          }
+
+  // Display loading message while initializing
+  if (initializing || !googleScriptLoaded) {
+  return (
+      <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-800 p-4 rounded-md">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="text-gray-600 dark:text-gray-300">Loading map...</div>
+        </div>
+        </div>
+    );
+  }
 
   return (
-    <div className="w-full h-full relative">
-      {error ? (
-        <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-800 rounded-md">
-          <p className="text-red-500 dark:text-red-400 text-center p-4 text-base md:text-lg">{error}</p>
-        </div>
-      ) : initializing ? (
-        <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-800 rounded-md">
-          <p className="text-gray-500 dark:text-gray-400 text-base md:text-lg">Loading map...</p>
-        </div>
-      ) : (
-        <>
-          <div className="absolute top-2 sm:top-3 left-2 sm:left-3 right-2 sm:right-3 z-10 bg-white dark:bg-gray-700 rounded-md shadow-md">
+    <div className="h-full relative">
+      {/* Map container */}
+      <div ref={mapRef} className="h-full w-full"></div>
+      
+      {/* Optional search box (hidden by default, can be enabled) */}
+      <div className="hidden">
             <input
               ref={searchBoxRef}
               type="text"
-              placeholder={isMobile ? "Search location" : "Search for a location"}
-              className="w-full p-2 md:p-3 rounded-md border border-gray-300 dark:border-gray-600 text-sm md:text-base dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          placeholder="Search for a location"
+          className="w-full p-2 border border-gray-300 rounded"
             />
           </div>
-          <div ref={mapRef} className="w-full h-full rounded-md" />
-          
-          {/* Location update indicator */}
-          {isUpdatingAddress && (
-            <div className="absolute top-12 sm:top-14 left-0 right-0 z-10 flex justify-center pointer-events-none">
-              <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full text-xs shadow-lg flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Updating address...
-              </div>
-            </div>
-          )}
-          
-          {/* Location marker indicator for mobile devices */}
-          {isMobile && (
-            <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center pointer-events-none">
-              <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full text-xs shadow-lg">
-                Tap to select this location
-              </div>
-            </div>
-          )}
-          
-          {/* Info panel for desktop */}
-          {!isMobile && (
-            <div className="absolute bottom-4 right-4 z-10 bg-white dark:bg-gray-800 rounded-md shadow-lg p-3 max-w-xs">
-              <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">Map Controls</h4>
-              <ul className="text-xs text-gray-700 dark:text-gray-300">
-                <li>• Click anywhere to place marker</li>
-                <li>• Drag marker to adjust position</li>
-                <li>• Use search box to find locations</li>
-                <li>• Use zoom controls to adjust view</li>
-              </ul>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 };

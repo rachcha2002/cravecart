@@ -8,6 +8,7 @@ import {
   UserIcon,
   SunIcon,
   MoonIcon,
+
 } from "@heroicons/react/24/outline";
 import { useCart } from "../hooks/useCart";
 import { toggleTheme } from "../features/theme/themeSlice";
