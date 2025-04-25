@@ -3,25 +3,17 @@
  */
 
 /**
- * Generates a random order number in the format ORD-XXXXXXXX
- * where X is a random alphanumeric character
+ * Generates a random order number in the format ORD-XXXXX
+ * where X is a 5-digit number
  * @returns A unique order number string
  */
 export const generateOrderNumber = (): string => {
   const prefix = 'ORD-';
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = prefix;
   
-  // Generate 8 random characters
-  for (let i = 0; i < 8; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
+  // Generate a random 5-digit number
+  const randomNumber = Math.floor(10000 + Math.random() * 90000);
   
-  // Add timestamp to ensure uniqueness (last 4 digits)
-  const timestamp = Date.now().toString().slice(-4);
-  result += timestamp;
-  
-  return result;
+  return `${prefix}${randomNumber}`;
 };
 
 /**
