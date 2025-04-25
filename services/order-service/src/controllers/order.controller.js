@@ -12,6 +12,58 @@ exports.createOrder = async (req, res) => {
       orderData.orderId = `ORD-${uuidv4().substring(0, 8)}`;
     }
     
+    // Ensure priceCalculation is present and properly formatted
+    if (!orderData.priceCalculation) {
+      // If not provided, create it from legacy fields for backward compatibility
+      orderData.priceCalculation = {
+        foodSubtotal: orderData.subtotal || 0,
+        restaurantCommission: 0, // Defaults since we don't have this data
+        baseDeliveryFee: orderData.deliveryFee || 0,
+        extraDistanceFee: 0,
+        totalDeliveryFee: orderData.deliveryFee || 0,
+        tipAmount: 0,
+        serviceFee: 0,
+        tax: orderData.tax || 0,
+        total: orderData.total || 0,
+        driverEarnings: 0,
+        companyFee: 0
+      };
+    } else {
+      // Make sure all required fields exist
+      orderData.priceCalculation = {
+        foodSubtotal: orderData.priceCalculation.foodSubtotal || orderData.subtotal || 0,
+        restaurantCommission: orderData.priceCalculation.restaurantCommission || 0,
+        baseDeliveryFee: orderData.priceCalculation.baseDeliveryFee || 0,
+        extraDistanceFee: orderData.priceCalculation.extraDistanceFee || 0,
+        totalDeliveryFee: orderData.priceCalculation.totalDeliveryFee || orderData.deliveryFee || 0,
+        tipAmount: orderData.priceCalculation.tipAmount || 0,
+        serviceFee: orderData.priceCalculation.serviceFee || 0,
+        tax: orderData.priceCalculation.tax || orderData.tax || 0,
+        total: orderData.priceCalculation.total || orderData.total || 0,
+        driverEarnings: orderData.priceCalculation.driverEarnings || 0,
+        companyFee: orderData.priceCalculation.companyFee || 0
+      };
+    }
+    
+    // Make sure legacy fields are set for backward compatibility
+    if (!orderData.subtotal && orderData.priceCalculation.foodSubtotal) {
+      orderData.subtotal = orderData.priceCalculation.foodSubtotal;
+    }
+    if (!orderData.deliveryFee && orderData.priceCalculation.totalDeliveryFee) {
+      orderData.deliveryFee = orderData.priceCalculation.totalDeliveryFee;
+    }
+    if (!orderData.tax && orderData.priceCalculation.tax) {
+      orderData.tax = orderData.priceCalculation.tax;
+    }
+    if (!orderData.total && orderData.priceCalculation.total) {
+      orderData.total = orderData.priceCalculation.total;
+    }
+    
+    // Ensure deliveryDistanceKM is set
+    if (!orderData.deliveryDistanceKM) {
+      orderData.deliveryDistanceKM = 0;
+    }
+    
     // Create a new order
     const order = new Order(orderData);
     
@@ -47,6 +99,7 @@ exports.createOrder = async (req, res) => {
       data: savedOrder
     });
   } catch (error) {
+    console.error('Error creating order:', error);
     res.status(400).json({
       success: false,
       message: error.message
