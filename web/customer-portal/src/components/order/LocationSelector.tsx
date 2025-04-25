@@ -215,22 +215,22 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
               });
             } else {
               // Fallback to the fetch API if geocoder is not available
-              const response = await fetch(
+            const response = await fetch(
                 `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
-              );
-              const data = await response.json();
-              
-              if (data.status === 'OK' && data.results && data.results.length > 0) {
-                const formattedAddress = data.results[0].formatted_address;
-                setAddress(formattedAddress);
+            );
+            const data = await response.json();
+            
+            if (data.status === 'OK' && data.results && data.results.length > 0) {
+              const formattedAddress = data.results[0].formatted_address;
+              setAddress(formattedAddress);
                 
                 // Update the search input value
                 if (searchInputRef.current) {
                   searchInputRef.current.value = formattedAddress;
                 }
                 
-                // Notify parent component of the address change
-                onAddressChange(formattedAddress);
+              // Notify parent component of the address change
+              onAddressChange(formattedAddress);
               } else {
                 setError('Could not determine address from your location');
               }
@@ -280,7 +280,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setAddress(value);
-    
+
     // Clear search results if input is empty
     if (!value) {
       setSearchResults([]);
@@ -323,13 +323,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2">
           <MapPinIcon className="h-5 w-5 md:h-6 md:w-6 text-gray-500 dark:text-gray-400 flex-shrink-0" />
           <div className="relative flex-1">
-            <input
+          <input
               ref={searchInputRef}
-              type="text"
+            type="text"
               placeholder="Search for a location..."
               className="w-full p-2 md:p-3 text-base md:text-lg border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
               defaultValue={address}
-              onChange={handleAddressChange}
+            onChange={handleAddressChange}
             />
             <button 
               type="submit"

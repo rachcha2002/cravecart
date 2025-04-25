@@ -87,24 +87,24 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
     }
 
     // Load Google Maps script if not already loading
-    const script = document.createElement('script');
+      const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=${callbackName}`;
-    script.async = true;
-    script.defer = true;
-    
-    // Handle script load error
-    script.onerror = () => {
-      setError('Failed to load Google Maps. Please check your internet connection and try again.');
-      setInitializing(false);
-    };
-    
-    document.head.appendChild(script);
-    
-    return () => {
+      script.async = true;
+      script.defer = true;
+      
+      // Handle script load error
+      script.onerror = () => {
+        setError('Failed to load Google Maps. Please check your internet connection and try again.');
+        setInitializing(false);
+      };
+      
+      document.head.appendChild(script);
+      
+      return () => {
       // Clean up the callback
       if (window[callbackName]) {
         delete window[callbackName];
-      }
+        }
       
       // Don't remove the script as it might be used by other components
     };
@@ -318,7 +318,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
             }
             
             // Update map and marker
-            newMap.setCenter(place.geometry.location);
+              newMap.setCenter(place.geometry.location);
             newMap.setZoom(15); // Zoom in when a place is selected
             newMarker.setPosition(place.geometry.location);
             
@@ -390,18 +390,18 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
   // Helper function to reverse geocode
   const reverseGeocode = (lat: number, lng: number) => {
     if (!geocoder) return;
-    
+      
     geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-      if (status === 'OK' && results[0]) {
-        const formattedAddress = results[0].formatted_address;
-        
+        if (status === 'OK' && results[0]) {
+          const formattedAddress = results[0].formatted_address;
+          
         // Update the search box if available
-        if (searchBoxRef.current) {
-          searchBoxRef.current.value = formattedAddress;
-        }
-        
+          if (searchBoxRef.current) {
+            searchBoxRef.current.value = formattedAddress;
+          }
+          
         // Notify parent component
-        onLocationSelect(lat, lng, formattedAddress);
+            onLocationSelect(lat, lng, formattedAddress);
       }
     });
   };
@@ -419,17 +419,17 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
         </button>
       </div>
     );
-  }
+          }
 
   // Display loading message while initializing
   if (initializing || !googleScriptLoaded) {
-    return (
+  return (
       <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-800 p-4 rounded-md">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <div className="text-gray-600 dark:text-gray-300">Loading map...</div>
         </div>
-      </div>
+        </div>
     );
   }
 
@@ -440,13 +440,13 @@ const MapPreview: React.FC<MapPreviewProps> = ({ address, onLocationSelect }) =>
       
       {/* Optional search box (hidden by default, can be enabled) */}
       <div className="hidden">
-        <input
-          ref={searchBoxRef}
-          type="text"
+            <input
+              ref={searchBoxRef}
+              type="text"
           placeholder="Search for a location"
           className="w-full p-2 border border-gray-300 rounded"
-        />
-      </div>
+            />
+          </div>
     </div>
   );
 };

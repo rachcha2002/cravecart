@@ -1,6 +1,54 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+// Schema for detailed price calculation
+const PriceCalculationSchema = new Schema({
+  foodSubtotal: {
+    type: Number,
+    required: true
+  },
+  restaurantCommission: {
+    type: Number,
+    required: true
+  },
+  baseDeliveryFee: {
+    type: Number,
+    required: true
+  },
+  extraDistanceFee: {
+    type: Number,
+    default: 0
+  },
+  totalDeliveryFee: {
+    type: Number,
+    required: true
+  },
+  tipAmount: {
+    type: Number,
+    default: 0
+  },
+  serviceFee: {
+    type: Number,
+    default: 0
+  },
+  tax: {
+    type: Number,
+    default: 0
+  },
+  total: {
+    type: Number,
+    required: true
+  },
+  driverEarnings: {
+    type: Number,
+    default: 0
+  },
+  companyFee: {
+    type: Number,
+    default: 0
+  }
+}, { _id: false });
+
 const OrderSchema = new Schema({
   orderId: {
     type: String,
@@ -41,6 +89,13 @@ const OrderSchema = new Schema({
     default: 'pending'
   },
 
+  // Price calculation fields
+  priceCalculation: {
+    type: PriceCalculationSchema,
+    required: true
+  },
+  
+  // Legacy fields for backward compatibility
   subtotal: {
     type: Number,
     required: true
@@ -57,6 +112,13 @@ const OrderSchema = new Schema({
     type: Number,
     required: true
   },
+  
+  // Delivery distance
+  deliveryDistanceKM: {
+    type: Number,
+    required: true
+  },
+  
   paymentId: {
     type: String,
     required: true
