@@ -7,6 +7,7 @@ const { port, serviceName, connectDB } = require("./config");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const restaurantRoutes = require("./routes/restaurantRoutes");
+const deliveryRoutes = require("./routes/DeliveryRoutes");
 
 // Initialize express app
 const app = express();
@@ -28,6 +29,7 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/restaurants", restaurantRoutes);
+app.use("/api/deliveries", deliveryRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -46,9 +48,8 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Start the server
 app.listen(port, () => {
   console.log(`${serviceName} running on port ${port}`);
 });
 
-module.exports = app; // For testing
+module.exports = app; 

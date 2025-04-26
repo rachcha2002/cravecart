@@ -20,7 +20,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-app.use('/api/delivery', Delivery); // Use the delivery routes
+app.use('/api/deliveries', Delivery); // Use the delivery routes
 
 // Routes will be added here
 
