@@ -2,9 +2,9 @@ const Delivery = require('../modules/delivery');
 
 exports.createDelivery = async (req, res) => {
     try {
-        const { orderId, driverId , acceptTime, pickupTime, deliveredTime, earnMoney, earnRate } = req.body;
+        const { orderId, driverId , acceptTime, pickupTime, deliveredTime, earnMoney} = req.body;
 
-        if (!orderId || !driverId || !acceptTime || !pickupTime || !deliveredTime || earnMoney === undefined || earnRate === undefined) {
+        if (!orderId || !driverId || !acceptTime || !pickupTime || !deliveredTime || earnMoney === undefined ) {
             return res.status(400).json({ message: 'Missing required fields.' });
         }
 
@@ -12,17 +12,13 @@ exports.createDelivery = async (req, res) => {
              return res.status(400).json({ message: 'Invalid date format provided.' });
         }
 
-        if (typeof earnMoney !== 'number' || typeof earnRate !== 'number') {
-            return res.status(400).json({ message: 'earnMoney and earnRate must be numbers.' });
-        }
         const newDelivery = new Delivery({
             orderId,
             driverId,
             acceptTime: new Date(acceptTime),
             pickupTime: new Date(pickupTime),
             deliveredTime: new Date(deliveredTime),
-            earnMoney,
-            earnRate 
+            earnMoney
         });
 
         const savedDelivery = await newDelivery.save();
@@ -131,19 +127,29 @@ exports.updateDeliveryRate = async (req, res) => {
 exports.getDeliveriesByDriverId = async (req, res) => {
     try {
         const { driverId } = req.params;
-
+        
         if (!driverId) {
-             return res.status(400).json({ message: 'Driver ID is required.' });
+            return res.status(400).json({
+                success: false,
+                message: "Driver ID is required"
+            });
         }
-        const deliveries = await Delivery.find({ driverId: driverId });
-
-        if (!deliveries || deliveries.length === 0) {
-            return res.status(200).json([]);
-        }
-
-        res.status(200).json(deliveries);
+        
+        const deliveries = await Delivery.find({ driverId })
+            .sort({ deliveredTime: -1 })
+            .populate('orderId');
+        
+        return res.status(200).json({
+            success: true,
+            data: deliveries,
+            message: "Deliveries fetched successfully"
+        });
     } catch (error) {
-        console.error("Error fetching deliveries by driver ID:", error);
-        res.status(500).json({ message: 'Error fetching deliveries for driver', error: error.message });
+        console.error('Error fetching deliveries by driver ID:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching deliveries",
+            error: error.message
+        });
     }
 };

@@ -147,6 +147,37 @@ const updateUserStatus = async (req, res) => {
       message: "User status updated successfully",
       user: user.toJSON(),
     });
+
+    // Send notification to the user about status change
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [id],
+            title: `Account Status Updated`,
+            message: `Your account status has been updated to ${status}. ${
+              status === "suspended"
+                ? "Please contact support for more information."
+                : status === "inactive"
+                ? "Your account is now inactive and you won't be able to use the platform services."
+                : "Your account is now active."
+            }`,
+            channels: ["Email"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send status update notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Update user status error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -176,6 +207,33 @@ const verifyUser = async (req, res) => {
       message: `User ${isVerified ? "verified" : "unverified"} successfully`,
       user: user.toJSON(),
     });
+
+    // Send notification to the user about verification status change
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [id],
+            title: `Account Verification Status Updated`,
+            message: `Your account has been ${
+              isVerified ? "verified" : "unverified"
+            }.`,
+            channels: ["Email", "SMS"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send verification status update notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Verify user error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -199,6 +257,31 @@ const deleteUser = async (req, res) => {
     await User.findByIdAndDelete(id);
 
     res.json({ message: "User deleted successfully" });
+
+    // Send notification to the user about account deletion
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [id],
+            title: `Account Deleted`,
+            message: `Your account has been deleted. If this was a mistake, please contact support.`,
+            channels: ["Email"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send account deletion notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Delete user error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -470,6 +553,31 @@ const updateRestaurantDescription = async (req, res) => {
       message: "Restaurant description updated successfully",
       description: user.restaurantInfo.description,
     });
+
+    // Send notification to the restaurant owner about description update
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [userId],
+            title: `Restaurant Description Updated`,
+            message: `Your restaurant description has been updated.`,
+            channels: ["Email"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send restaurant description update notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Update restaurant description error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -647,6 +755,30 @@ const deactivateOwnAccount = async (req, res) => {
       message: "Account deactivated successfully",
       user: user.toJSON(),
     });
+    // Send notification to the user about account deactivation
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [req.user._id],
+            title: `Account Deactivated`,
+            message: `Your account has been deactivated. If this was a mistake, please contact support.`,
+            channels: ["Email"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send account deactivation notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Deactivate own account error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -767,6 +899,28 @@ const updateDeliveryDocuments = async (req, res) => {
       message: `${documentType} document updated successfully`,
       document: user.deliveryInfo.documents[documentType],
     });
+
+    // Notify admin about new document upload
+    try {
+      await fetch(`${process.env.Notification_SERVICE_URL}/api/notifications`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roles: ["Admin"],
+          title: "New Delivery Document Uploaded",
+          message: `A ${documentType} document has been uploaded by ${user.name} (${user.email}) and needs verification.`,
+          channels: ["IN_APP", "Email"], //PUSH,SMS
+        }),
+      });
+    } catch (notificationError) {
+      console.error(
+        "Failed to send document upload notification to admin:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Update delivery documents error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -825,6 +979,33 @@ const verifyDeliveryDocument = async (req, res) => {
       message: `${documentType} document verification status updated`,
       document: user.deliveryInfo.documents[documentType],
     });
+
+    // Notify user about document verification status
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [id],
+            title: `Document Verification Status Updated`,
+            message: `Your ${documentType} document has been ${
+              verified ? "verified" : "unverified"
+            }.`,
+            channels: ["Email"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send document verification status notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Verify delivery document error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -917,6 +1098,44 @@ const resetUserPassword = async (req, res) => {
       message: "Password reset successful",
       newPassword: newPassword, // Remove this in production
     });
+
+    // Send notification to the user about password reset
+    try {
+      await fetch(
+        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [id],
+            title: `Password Reset`,
+            message: `Your password has been reset. Your new password is ${newPassword}. Please change it after logging in.`,
+            channels: ["Email"],
+            ...(user.role === "customer" && {
+              actionUrl: `${process.env.Customer_WEB_URL}/login`,
+              apiText: `Visit to login and change your password`,
+            }),
+            ...(user.role === "admin" && {
+              actionUrl: `${process.env.Admin_WEB_URL}/login`,
+              apiText: `Visit to login and change your password`,
+            }),
+            ...(user.role === "restaurant" && {
+              actionUrl: `${process.env.Restaurant_WEB_URL}/login`,
+              apiText: `Visit to login and change your password`,
+            }),
+            // No actionUrl or apiText for delivery role
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send password reset notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Reset password error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -955,6 +1174,30 @@ const createAdmin = async (req, res) => {
       message: "Admin user created successfully",
       user: admin.toJSON(),
     });
+
+    // Send notification to all existing admins about new admin creation
+    try {
+      await fetch(`${process.env.Notification_SERVICE_URL}/api/notifications`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roles: ["admin"],
+          title: "New Admin User Created",
+          message: `A new admin user "${name}" (${email}) has been created.`,
+          channels: ["IN_APP", "Email", "SMS"],
+          actionUrl: `${process.env.Admin_WEB_URL}/users`,
+          apiText: `Visit to view the new admin user`,
+        }),
+      });
+    } catch (notificationError) {
+      console.error(
+        "Failed to send admin creation notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Create admin error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -1022,6 +1265,7 @@ const getUserContactInfo = async (req, res) => {
         email: user.email,
         phoneNumber: user.phoneNumber,
         name: user.name,
+        role: user.role,
       },
     });
   } catch (error) {

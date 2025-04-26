@@ -27,8 +27,8 @@ const deliverySchema = new mongoose.Schema({
     default: 0,
   },
   earnRate: { 
-    type: Number, 
-    required: true,
+    type: Number,
+    default: 0
   },
 }, { timestamps: true }); 
 
