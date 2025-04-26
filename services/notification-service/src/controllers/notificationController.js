@@ -565,7 +565,7 @@ const sendDirectNotification = async (req, res) => {
     for (const userId of userIds) {
       try {
         const response = await axios.get(
-          `${process.env.USER_SERVICE_URL}/api/users/${userId}`
+          `${process.env.USER_SERVICE_URL}/api/users/contact/${userId}`
         );
 
         if (response.data && response.data.success) {
@@ -593,7 +593,7 @@ const sendDirectNotification = async (req, res) => {
       }
 
       const receiverData = {
-        userId: user._id,
+        userId: user.userId,
         userType: user.role || "UNKNOWN", // Add the userType field
         receivingData: [],
       };
@@ -699,7 +699,7 @@ const sendDirectNotification = async (req, res) => {
                       <body>
                           <div class="email-container">
                               <div class="email-header">
-                                  <img src="https://i.ibb.co/DLDDLJG/cravecart-logo.png" alt="CraveCart Logo" class="logo">
+                                  <img src="https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745527245/logo_jxgxfg.png" alt="CraveCart Logo" class="logo">
                               </div>
                               <div class="email-content">
                                   <h1 class="email-title">${title}</h1>
