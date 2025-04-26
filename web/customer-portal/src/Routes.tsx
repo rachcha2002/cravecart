@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
@@ -15,11 +14,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import OrderSummaryPage from './pages/order/OrderSummaryPage';
 import OrderSuccessPage from './pages/order/OrderSuccessPage';
 import OrderFailedPage from './pages/order/OrderFailedPage';
-import CartPage from './pages/order/CartPage';
 import PaymentSummaryPage from './pages/payment/PaymentSummaryPage';
 import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
 import PaymentFailedPage from './pages/payment/PaymentFailedPage';
 import RestaurantPage from './pages/RestaurantPage';
+import RestaurantMenuPage from './pages/menu/RestaurantMenuPage';
 import PublicRoute from "./components/PublicRoute";
 
 
@@ -49,6 +48,7 @@ const Routes: React.FC = () => {
         />
         
          <Route path='restaurants' element={<RestaurantPage/>}/>
+        <Route path="restaurants/:id" element={<RestaurantMenuPage />} />
 
         <Route
           path="profile"
@@ -73,7 +73,6 @@ const Routes: React.FC = () => {
           />
         </Route>
         <Route path="order">
-          <Route path="cart" element={<CartPage />} />
           <Route path="summary" element={<OrderSummaryPage />} />
           <Route path="success" element={<OrderSuccessPage />} />
           <Route path="failed" element={<OrderFailedPage />} />

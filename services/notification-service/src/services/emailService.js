@@ -1,5 +1,21 @@
 // emailService.js
 const nodemailer = require("nodemailer");
+const winston = require("winston");
+
+// Configure logger
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.simple(),
+    }),
+    new winston.transports.File({ 
+      filename: 'error.log', 
+      level: 'error' 
+    }),
+  ],
+});
 
 // Create email transporter
 const createTransporter = () => {
@@ -94,7 +110,8 @@ const sendMail = async (req, res) => {
       mailOptions.attachments = attachments;
     }
 
-    // Send mail
+    // Create transporter and send mail
+    const transporter = createTransporter();
     await transporter.sendMail(mailOptions);
     logger.info(`Email sent successfully to ${to}`);
 

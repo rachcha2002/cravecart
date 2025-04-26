@@ -1,25 +1,30 @@
-// src/routes/menuRoutes.js
 const express = require('express');
-const menuController = require('../controllers/menuController');
 const router = express.Router();
+const menuController = require('../controllers/menuController');
+const { authenticate, authorizeRestaurant } = require('../middleware/auth');
 
+// Middleware to authenticate and authorize restaurant users
+// These would communicate with the user-service to verify tokens and roles
 
-// Base menu routes
-router.post('/',  menuController.createMenu);
-router.get('/restaurant/:restaurantId', menuController.getMenuByRestaurantId);
-router.put('/:id',  menuController.updateMenu);
+// Menu routes
+router.post('/create/:restaurantId', menuController.createMenu);
+router.get('/getmenus/:restaurantId', menuController.getMenu);
 
-// Menu category routes
-router.post('/:id/categories', menuController.addMenuCategory);
-router.put('/:menuId/categories/:categoryId',  menuController.updateMenuCategory);
-router.delete('/:menuId/categories/:categoryId',  menuController.deleteMenuCategory);
+// Category routes
+router.post('/createcategory/:restaurantId', menuController.addCategory);
+router.put('/editcategory/:restaurantId/:categoryId', menuController.updateCategory);
+router.delete('/deletecategory/:restaurantId/:categoryId',  menuController.deleteCategory);
 
 // Menu item routes
-router.post('/:menuId/categories/:categoryId/items',  menuController.addMenuItem);
-router.put('/:menuId/categories/:categoryId/items/:itemId',  menuController.updateMenuItem);
-router.delete('/:menuId/categories/:categoryId/items/:itemId',  menuController.deleteMenuItem);
+router.post('/:restaurantId/menu/categories/:categoryId/items',  menuController.addMenuItem);
+// Add Image route
+router.post('/addmenuitemimage/:restaurantId/:categoryId/:itemId', menuController.addMenuItemImage);
+router.get('/:restaurantId/menu/categories/:categoryId/items/:itemId', menuController.getMenuItem);
+router.put('/:restaurantId/menu/categories/:categoryId/items/:itemId',  menuController.updateMenuItem);
+router.delete('/:restaurantId/menu/categories/:categoryId/items/:itemId',  menuController.deleteMenuItem);
 
-// Item availability toggle
-router.patch('/:menuId/categories/:categoryId/items/:itemId/availability', menuController.toggleItemAvailability);
+// Customization routes
+router.post('/:restaurantId/menu/categories/:categoryId/items/:itemId/customization-groups',  menuController.addCustomizationGroup);
+router.post('/:restaurantId/menu/categories/:categoryId/items/:itemId/customization-groups/:groupId/options', menuController.addCustomizationOption);
 
 module.exports = router;

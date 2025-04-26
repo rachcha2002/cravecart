@@ -49,7 +49,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
   };
 
   const formatCurrency = (amount: number): string => {
-    return `₹${amount.toFixed(2)}`;
+    return `Rs. ${amount.toFixed(2)}`;
   };
 
   const handleStatusChange = (newStatus: string) => {
@@ -90,7 +90,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
           
           {/* Header Section */}
           <div className="bg-gradient-to-r from-[#f29f05]/10 to-[#f29f05]/5 border-b border-[#f29f05]/10 px-6 py-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-white h-14 w-14 rounded-xl border border-[#f29f05]/20 shadow-sm flex items-center justify-center">
                   <span className="text-[#f29f05] text-xl font-bold">{order.orderId.substring(4, 6)}</span>
@@ -107,19 +107,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col items-end">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadgeClasses(order.status)}`}>
-                  {order.status.replace(/-/g, ' ')}
-                </span>
                 {onUpdateStatus && (
-                  <div className="mt-2">
+                <div className="z-20 relative">
                     <StatusUpdateDropdown
                       currentStatus={order.status}
                       onStatusChange={handleStatusChange}
                     />
                   </div>
                 )}
-              </div>
             </div>
           </div>
           
@@ -204,7 +199,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                           <svg className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                           </svg>
-                          {order.user.phoneNumber || 'No phone number provided'}
+                          <span className="font-medium">{order.user.phoneNumber || 'No phone number provided'}</span>
                         </div>
                       </div>
                     </div>

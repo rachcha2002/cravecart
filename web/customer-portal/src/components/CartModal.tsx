@@ -1,10 +1,8 @@
-import { Fragment, useEffect } from 'react';
+import { Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import { useDispatch } from 'react-redux';
-import { useCart } from '../hooks/useCart';
-import { addItem } from '../features/cart/cartSlice';
+import { XMarkIcon, ShoppingBagIcon } from '@heroicons/react/24/outline';
+import { useCart } from '../contexts/CartContext';
 import CartItems from './order/CartItems';
 
 interface CartModalProps {
@@ -12,54 +10,35 @@ interface CartModalProps {
   onClose: () => void;
 }
 
-// Dummy food items data for initial cart population
-const dummyFoodItems = [
-  {
-    id: '1',
-    name: 'Chicken Burger',
-    price: 12.99,
-    restaurantId: 'rest1',
-    image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8MTB8fGJ1cmdlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=500&q=60',
-  },
-  {
-    id: '3',
-    name: 'French Fries',
-    price: 4.99,
-    restaurantId: 'rest1',
-    image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8OXx8ZnJpZXN8ZW58MHx8MHx8&auto=format&fit=crop&w=500&q=60',
-  },
-];
-
 const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { items, totalAmount, isEmpty } = useCart();
-
-  // Add dummy items to cart on initial load if cart is empty
-  useEffect(() => {
-    if (isEmpty && isOpen) {
-      // Add first two dummy items to cart
-      dispatch(addItem({ 
-        item: { ...dummyFoodItems[0], quantity: 1 }, 
-        restaurantId: dummyFoodItems[0].restaurantId 
-      }));
-      dispatch(addItem({ 
-        item: { ...dummyFoodItems[1], quantity: 2 }, 
-        restaurantId: dummyFoodItems[1].restaurantId 
-      }));
-    }
-  }, [dispatch, isEmpty, isOpen]);
-
-  // Calculate tax and delivery fee
-  const tax = totalAmount * 0.08; // 8% tax
-  const deliveryFee = 2.99;
-  const orderTotal = totalAmount + tax + deliveryFee;
+  const { 
+    items,
+    total, 
+    tax, 
+    deliveryFee, 
+    orderTotal, 
+    isEmpty,
+    clearCart,
+    restaurantName
+  } = useCart();
 
   const handleCheckout = () => {
     // Close the modal first
     onClose();
     // Navigate to order summary page
     navigate('/order/summary');
+  };
+
+  const handleContinueShopping = () => {
+    onClose();
+  };
+
+  const handleViewRestaurant = () => {
+    if (items.length > 0) {
+      onClose();
+      navigate(`/restaurants/${items[0].restaurantId}`);
+    }
   };
 
   return (
@@ -91,9 +70,8 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
               >
                 <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
                   <div className="flex h-full flex-col bg-white dark:bg-gray-800 shadow-xl">
-                    <div className="flex-1 overflow-y-auto py-6 px-4 sm:px-6">
-                      <div className="flex items-start justify-between">
-                        <Dialog.Title className="text-lg font-medium text-gray-900 dark:text-white">Shopping cart</Dialog.Title>
+                    <div className="flex items-start justify-between py-4 px-6 border-b border-gray-200 dark:border-gray-700">
+                      <Dialog.Title className="text-lg font-medium text-gray-900 dark:text-white">Your Cart</Dialog.Title>
                         <div className="ml-3 flex h-7 items-center">
                           <button
                             type="button"
@@ -107,17 +85,48 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
                         </div>
                       </div>
 
-                      <div className="mt-8">
-                        <div className="flow-root">
-                          <CartItems compact />
+                    <div className="flex-1 overflow-y-auto py-6 px-4 sm:px-6">
+                      {items.length > 0 && restaurantName && (
+                        <div className="mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mr-3">
+                              <ShoppingBagIcon className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-gray-900 dark:text-white">
+                                {restaurantName}
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Your items from this restaurant
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex justify-between">
+                            <button 
+                              onClick={handleViewRestaurant}
+                              className="text-primary hover:text-primary-dark text-sm font-medium"
+                            >
+                              View Restaurant
+                            </button>
+                            <button 
+                              onClick={() => clearCart()}
+                              className="text-red-500 hover:text-red-700 text-sm font-medium"
+                            >
+                              Clear Cart
+                            </button>
+                          </div>
                         </div>
+                      )}
+                      
+                      <div className="flow-root">
+                        <CartItems compact />
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-200 py-6 px-4 sm:px-6">
+                    <div className="border-t border-gray-200 dark:border-gray-700 py-6 px-4 sm:px-6">
                       <div className="flex justify-between text-base font-medium text-gray-900 dark:text-white">
                         <p>Subtotal</p>
-                        <p>${totalAmount.toFixed(2)}</p>
+                        <p>${total.toFixed(2)}</p>
                       </div>
                       <div className="flex justify-between mt-1 text-sm text-gray-600 dark:text-gray-400">
                         <p>Tax</p>
@@ -131,22 +140,23 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
                         <p>Total</p>
                         <p>${orderTotal.toFixed(2)}</p>
                       </div>
-                      <p className="mt-0.5 text-sm text-gray-500">Shipping and taxes calculated at checkout.</p>
+                      <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Shipping and taxes calculated at checkout.</p>
                       <div className="mt-6">
                         <button
                           onClick={handleCheckout}
-                          className="w-full flex justify-center items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-primary-600 hover:bg-primary-700"
+                          className="w-full flex justify-center items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                          disabled={isEmpty}
                         >
                           Checkout
                         </button>
                       </div>
-                      <div className="mt-6 flex justify-center text-center text-sm text-gray-500">
+                      <div className="mt-6 flex justify-center text-center text-sm text-gray-500 dark:text-gray-400">
                         <p>
                           or{' '}
                           <button
                             type="button"
                             className="font-medium text-primary hover:text-primary-dark"
-                            onClick={onClose}
+                            onClick={handleContinueShopping}
                           >
                             Continue Shopping
                             <span aria-hidden="true"> &rarr;</span>

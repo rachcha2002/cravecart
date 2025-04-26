@@ -51,6 +51,10 @@
     ]
   },
   "devDependencies": {
-    "@tailwindcss/forms": "^0.5.10"
+    "@tailwindcss/forms": "^0.5.10",
+    "@types/classnames": "^2.3.4",
+    "classnames": "^2.5.1",
+    "install": "^0.13.0",
+    "npm": "^11.3.0"
   }
 }

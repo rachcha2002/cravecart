@@ -8,9 +8,8 @@ import {
   UserIcon,
   SunIcon,
   MoonIcon,
-
 } from "@heroicons/react/24/outline";
-import { useCart } from "../hooks/useCart";
+import { useCart } from "../contexts/CartContext";
 import { toggleTheme } from "../features/theme/themeSlice";
 import CartModal from "./CartModal";
 import NotificationBell from "./notification/NotificationBell";
@@ -19,7 +18,7 @@ import { useAuth } from "../contexts/AuthContext";
 const Navbar = () => {
   const dispatch = useDispatch();
   const { user, isAuthenticated, logout } = useAuth();
-  const { items } = useCart();
+  const { items, itemCount } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
@@ -92,13 +91,13 @@ const Navbar = () => {
 
               <button
                 onClick={() => setIsCartOpen(true)}
-                className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 aria-label="Shopping cart"
               >
                 <ShoppingCartIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-                {items.length > 0 && (
+                {itemCount > 0 && (
                   <span className="absolute top-0 right-0 block h-4 w-4 transform -translate-y-1/2 translate-x-1/2 rounded-full bg-primary text-white text-xs flex items-center justify-center">
-                    {items.length}
+                    {itemCount}
                   </span>
                 )}
               </button>
