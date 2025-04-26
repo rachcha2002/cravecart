@@ -911,7 +911,7 @@ const updateDeliveryDocuments = async (req, res) => {
           roles: ["Admin"],
           title: "New Delivery Document Uploaded",
           message: `A ${documentType} document has been uploaded by ${user.name} (${user.email}) and needs verification.`,
-          channels: ["IN_APP", "Email"],
+          channels: ["IN_APP", "Email"], //PUSH,SMS
         }),
       });
     } catch (notificationError) {

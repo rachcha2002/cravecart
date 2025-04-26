@@ -66,12 +66,10 @@ const sendInApp = async (userId, notification, userType) => {
       // Send the updated count
       io[namespace].to(userId.toString()).emit("unreadCount", { count });
 
-      // Note: We don't mark as delivered here because we don't know
-      // if the client actually received it
       return true;
     }
 
-    // Even if socket isn't available, we mark it as SENT
+    // If socket is not available, log the event
     return true;
   } catch (error) {
     logger.error("In-app notification failed:", error.message);
@@ -865,7 +863,6 @@ const sendDirectNotification = async (req, res) => {
   }
 };
 
-// Add this function to your notification controller
 const markNotificationAsRead = async (req, res) => {
   try {
     const { notificationId } = req.params;
@@ -948,7 +945,6 @@ const markNotificationAsRead = async (req, res) => {
   }
 };
 
-// Add this function to your notification controller with enhanced error handling
 const getUnreadNotificationsCount = async (req, res) => {
   let retryCount = 0;
   const maxRetries = 3;
@@ -996,7 +992,6 @@ const getUnreadNotificationsCount = async (req, res) => {
         count,
       });
     } catch (error) {
-      // Check if we should retry
       if (
         retryCount < maxRetries &&
         (error.code === "ECONNRESET" ||
@@ -1020,7 +1015,6 @@ const getUnreadNotificationsCount = async (req, res) => {
         });
       }
 
-      // If we're here, we've exhausted retries or hit a non-retriable error
       logger.error(`Failed to get unread notifications count:`, {
         error: error.message,
         code: error.code,
@@ -1040,7 +1034,6 @@ const getUnreadNotificationsCount = async (req, res) => {
   return attemptFetchCount();
 };
 
-// In your notification controller
 const getUnreadNotifications = async (req, res) => {
   try {
     const { userId } = req.params;
