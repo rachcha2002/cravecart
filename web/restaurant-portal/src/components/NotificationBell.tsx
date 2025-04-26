@@ -1,174 +1,257 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useNotifications, Notification } from '../contexts/NotificationContext';
-import NotificationSettings from './NotificationSettings';
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useNotifications } from "../contexts/NotificationContext";
+import { Bell, Settings, Check } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { toast } from "react-hot-toast"; // Add this import
 
-const NotificationBell: React.FC = () => {
+const RestaurantNotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { notifications, unreadCount, markAsRead, markAllAsRead, socket } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    socketConnected,
+    reconnectSocket,
+    fetchUnreadNotifications,
+  } = useNotifications();
   const navigate = useNavigate();
-
-  // Track socket connection status
-  useEffect(() => {
-    if (!socket) return;
-    
-    setIsConnected(socket.connected);
-    
-    const handleConnect = () => setIsConnected(true);
-    const handleDisconnect = () => setIsConnected(false);
-    
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-    };
-  }, [socket]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  // Handle notification click
-  const handleNotificationClick = (notification: Notification) => {
-    markAsRead(notification.id);
-    
-    // If it's an order notification, navigate to the order detail page
-    if (notification.orderId) {
-      setIsOpen(false);
-      // You can update this to navigate to a specific order page if needed
-      navigate('/orders');
+  // Format timestamp
+  const formatTime = (date: Date) => {
+    try {
+      return formatDistanceToNow(new Date(date), { addSuffix: true });
+    } catch (error) {
+      return "some time ago";
     }
   };
 
-  // Open notification settings
-  const handleOpenSettings = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsSettingsOpen(true);
-    setIsOpen(false);
+  // Handle notification click
+  const handleNotificationClick = async (id: string, orderId?: string) => {
+    await markAsRead(id);
+
+    // If order notification, navigate to order details
+    if (orderId) {
+      setIsOpen(false);
+      navigate(`/orders/${orderId}`);
+    }
   };
 
-  // Format time passed since notification
-  const formatTimeSince = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - new Date(date).getTime();
-    const diffMins = Math.round(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-    return `${Math.floor(diffMins / 1440)}d ago`;
+  // Determine icon based on notification type
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case "new-order":
+        return (
+          <div className="w-8 h-8 flex items-center justify-center bg-green-100 rounded-full text-green-600">
+            🍔
+          </div>
+        );
+      case "order-status-update":
+        return (
+          <div className="w-8 h-8 flex items-center justify-center bg-blue-100 rounded-full text-blue-600">
+            📝
+          </div>
+        );
+      default:
+        return (
+          <div className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-600">
+            ℹ️
+          </div>
+        );
+    }
+  };
+
+  // Manual refresh function
+  const handleRefresh = () => {
+    fetchUnreadNotifications();
+    toast.success("Notifications refreshed");
   };
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1 rounded-full text-gray-600 hover:text-gray-800 focus:outline-none"
+        className="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none"
         aria-label="Notifications"
       >
-        <div className="relative">
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="h-6 w-6" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={1.5} 
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
-            />
-          </svg>
-          {/* Connection status indicator */}
-          <span 
-            className={`absolute -bottom-1 -left-1 w-2 h-2 rounded-full ${
-              isConnected ? 'bg-green-500' : 'bg-red-500'
-            }`}
-            title={isConnected ? "Connected to notifications" : "Disconnected from notifications"}
-          ></span>
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </div>
+        <Bell className="h-6 w-6" />
+
+        {/* Connection status indicator */}
+        <span
+          className={`absolute top-1 right-1 block h-2 w-2 rounded-full ${
+            socketConnected ? "bg-green-500" : "bg-red-500"
+          }`}
+          title={socketConnected ? "Connected" : "Disconnected"}
+        />
+
+        {/* Unread count badge */}
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
       </button>
 
+      {/* Notification dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-50 max-h-[80vh] overflow-y-auto">
-          <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-gray-700">Notifications</h3>
+        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg overflow-hidden z-50">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
             <div className="flex items-center space-x-2">
+              <Bell className="h-5 w-5 text-gray-600" />
+              <h2 className="text-lg font-semibold text-gray-800">
+                Notifications
+              </h2>
               {unreadCount > 0 && (
-                <button 
-                  onClick={markAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-800"
+                <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
+            <div className="flex space-x-2">
+              {!socketConnected && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    reconnectSocket();
+                  }}
+                  className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
                 >
-                  Mark all as read
+                  Reconnect
                 </button>
               )}
               <button
-                onClick={handleOpenSettings}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
-                title="Notification Settings"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRefresh();
+                }}
+                className="text-gray-500 hover:text-gray-700"
+                title="Refresh"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
           </div>
-          <div>
+
+          {/* Actions */}
+          {notifications.length > 0 && (
+            <div className="p-3 border-b border-gray-200 bg-white flex justify-between items-center">
+              {unreadCount > 0 && (
+                <button
+                  onClick={() => markAllAsRead()}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Mark all as read
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Notification list */}
+          <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
-              <div className="py-6 px-4 text-center text-gray-500">
+              <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center">
+                <Bell className="h-8 w-8 text-gray-300 mb-2" />
                 <p>No notifications</p>
               </div>
             ) : (
               <div>
                 {notifications.map((notification) => (
-                  <div 
+                  <div
                     key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      !notification.read ? 'bg-blue-50' : ''
+                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
+                      !notification.read ? "bg-blue-50" : ""
                     }`}
+                    onClick={() =>
+                      handleNotificationClick(
+                        notification.id,
+                        notification.orderId
+                      )
+                    }
                   >
-                    <div className="flex items-start">
-                      <div className={`mt-1 mr-3 p-1 rounded-full ${notification.type === 'new-order' ? 'bg-green-100 text-green-500' : 'bg-blue-100 text-blue-500'}`}>
-                        {notification.type === 'new-order' ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
+                    <div className="flex items-start space-x-3">
+                      {getNotificationIcon(notification.type)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between">
+                          <p
+                            className={`text-sm font-semibold ${
+                              !notification.read
+                                ? "text-blue-600"
+                                : "text-gray-800"
+                            }`}
+                          >
+                            {notification.title ||
+                              (notification.type === "new-order"
+                                ? "New Order"
+                                : "Order Update")}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatTime(notification.timestamp)}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {notification.message}
+                        </p>
+                        {notification.orderId && (
+                          <p className="text-xs mt-1 text-gray-500">
+                            Order #{notification.orderId}
+                          </p>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-800 font-medium">{notification.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">{formatTimeSince(notification.timestamp)}</p>
-                      </div>
                       {!notification.read && (
-                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                        <span className="w-2 h-2 mt-1 rounded-full bg-blue-600 flex-shrink-0"></span>
                       )}
                     </div>
                   </div>
@@ -176,16 +259,22 @@ const NotificationBell: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Footer */}
+          <div className="p-3 border-t bg-gray-50 text-xs text-center text-gray-500">
+            <p>
+              Status:{" "}
+              {socketConnected ? (
+                <span className="text-green-600">Connected</span>
+              ) : (
+                <span className="text-red-600">Disconnected</span>
+              )}
+            </p>
+          </div>
         </div>
       )}
-      
-      {/* Notification Settings Modal */}
-      <NotificationSettings 
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
     </div>
   );
 };
 
-export default NotificationBell; 
+export default RestaurantNotificationBell;
