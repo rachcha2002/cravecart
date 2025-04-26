@@ -1,5 +1,5 @@
 // restaurantService.ts
-import { RestaurantsResponse, RestaurantResponse, ErrorResponse } from '../types/restaurant';
+import { RestaurantsResponse, RestaurantResponse } from '../types/restaurant';
 import {  MenuResponse } from '../types/menu';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
@@ -54,7 +54,7 @@ export const restaurantService = {
  */
   getMenuByRestaurantId: async (restaurantId: string): Promise<MenuResponse> => {
    try {
-    const response = await fetch(`${API_MENU_URL}/restaurant/${restaurantId}`);
+    const response = await fetch(`${API_MENU_URL}/getmenus/${restaurantId}`);
     const data = await response.json();
     
     if (!response.ok) {

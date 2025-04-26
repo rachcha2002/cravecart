@@ -1,161 +1,87 @@
-// src/middleware/auth.js
 const jwt = require('jsonwebtoken');
-const { getUserById } = require('../utils/userServiceClient');
+const axios = require('axios');
 
-// JWT secret should be stored in environment variables
+// Config for user-service connection
+const userServiceBaseUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001/api';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-/**
- * Authenticate user with JWT token from Authorization header
- */
 exports.authenticate = async (req, res, next) => {
   try {
-    // Get token from Authorization header
+    // Extract token from authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'Authentication required. Please provide a valid token.'
+        message: 'Authentication required. No token provided.'
       });
     }
 
     const token = authHeader.split(' ')[1];
-
+    
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Attach user to request object
+    // Set user info in request object
     req.user = {
-      id: decoded.userId,
+      id: decoded.id,
       role: decoded.role
     };
-
+    
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-    
-    return res.status(500).json({
+    return res.status(401).json({
       success: false,
-      message: 'Authentication error',
-      error: error.message
+      message: 'Invalid or expired token'
     });
   }
 };
 
-/**
- * Authorize restaurant owners/staff to manage their own restaurant's menu
- * This middleware should be used after the authenticate middleware
- */
 exports.authorizeRestaurant = async (req, res, next) => {
   try {
-    // First check if user has admin role (can access all)
-    if (req.user.role === 'admin') {
-      return next();
+    // Check if user has restaurant role
+    if (req.user.role !== 'restaurant') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Restaurant privileges required.'
+      });
     }
-
-    // Get the restaurant ID either from the request body, params, or query
-    let restaurantId = req.body.restaurantId;
     
-    // If no restaurantId in body, check if we're dealing with existing menu
-    if (!restaurantId) {
-      // For update operations using menuId
-      if (req.params.id) {
-        const Menu = require('../models/menu');
-        const menu = await Menu.findById(req.params.id);
-        if (!menu) {
-          return res.status(404).json({
-            success: false,
-            message: 'Menu not found'
-          });
+    // Validate that this user owns this restaurant
+    const { restaurantId } = req.params;
+    
+    // Make API call to user-service to validate ownership
+    // This is how microservices communicate with each other
+    try {
+      const response = await axios.get(`${userServiceBaseUrl}/restaurants/validate-restaurant-access`, {
+        params: {
+          userId: req.user.id,
+          restaurantId: restaurantId
+        },
+        headers: {
+          'Authorization': req.headers.authorization
         }
-        restaurantId = menu.restaurantId;
-      } 
-      // For operations on existing menu using menuId
-      else if (req.params.menuId) {
-        const Menu = require('../models/menu');
-        const menu = await Menu.findById(req.params.menuId);
-        if (!menu) {
-          return res.status(404).json({
-            success: false,
-            message: 'Menu not found'
-          });
-        }
-        restaurantId = menu.restaurantId;
+      });
+      
+      if (response.data.success) {
+        next();
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have permission to manage this restaurant'
+        });
       }
-    }
-
-    if (!restaurantId) {
-      return res.status(400).json({
+    } catch (error) {
+      // If user-service is down or returns an error
+      console.error('Error validating with user-service:', error.message);
+      return res.status(500).json({
         success: false,
-        message: 'Restaurant ID is required'
+        message: 'Error validating restaurant ownership'
       });
     }
-
-    // Get user details from user service
-    const user = await getUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Check if user is associated with the restaurant
-    // This assumes user object has restaurantId property or restaurants array
-    const isRestaurantOwner = user.restaurantId && user.restaurantId.toString() === restaurantId.toString();
-    const isRestaurantStaff = user.restaurants && 
-                             Array.isArray(user.restaurants) && 
-                             user.restaurants.some(id => id.toString() === restaurantId.toString());
-
-    if (isRestaurantOwner || isRestaurantStaff) {
-      return next();
-    }
-
-    return res.status(403).json({
-      success: false,
-      message: 'You are not authorized to manage this restaurant\'s menu'
-    });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: 'Authorization error',
-      error: error.message
+      message: error.message || 'Authorization error'
     });
   }
-};
-
-/**
- * Check if user has admin role
- */
-exports.authorizeAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
-    return next();
-  }
-  
-  return res.status(403).json({
-    success: false,
-    message: 'Admin access required'
-  });
-};
-
-/**
- * Middleware to authorize specific roles
- * @param {Array} roles - Array of authorized roles
- */
-exports.authorizeRoles = (roles) => {
-  return (req, res, next) => {
-    if (req.user && roles.includes(req.user.role)) {
-      return next();
-    }
-    
-    return res.status(403).json({
-      success: false,
-      message: 'You do not have permission to perform this action'
-    });
-  };
 };
