@@ -53,44 +53,6 @@ const handleApiError = (error: any, customMessage: string) => {
   throw error;
 };
 
-// Add a new method for real-time order updates using SSE
-const subscribeToOrderUpdates = (orderId: string, callback: (data: any) => void) => {
-  try {
-    // Get authentication token
-    const token = localStorage.getItem('token');
-    if (!token) {
-      return null;
-    }
-    
-    // Create EventSource connection to the server with authentication
-    const eventSource = new EventSource(`${ORDER_API_URL}/${orderId}/updates?token=${token}`);
-    
-    // Handle incoming messages
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        callback(data);
-      } catch (error) {
-        // Error will be handled by error boundary
-      }
-    };
-    
-    // Handle errors
-    eventSource.onerror = (error) => {
-      // Try to reconnect after a delay
-      setTimeout(() => {
-        eventSource.close();
-        subscribeToOrderUpdates(orderId, callback);
-      }, 5000);
-    };
-    
-    // Return the event source so it can be closed if needed
-    return eventSource;
-  } catch (error) {
-    return null;
-  }
-};
-
 const orderService = {
   // Create a new order
   createOrder: async (orderData: any) => {
@@ -157,9 +119,7 @@ const orderService = {
     } catch (error) {
       return handleApiError(error, 'Error updating payment status');
     }
-  },
-
-  subscribeToOrderUpdates  // Add the new method to the exported object
+  }
 };
 
 export default orderService; 

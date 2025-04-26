@@ -23,7 +23,7 @@ router.patch('/:orderId/status', orderController.updateOrderStatus);
 // Update payment status
 router.patch('/:orderId/payment', orderController.updatePaymentStatus);
 
-// NEW ENDPOINT: Get real-time order updates (for SSE or polling)
+// Get order status updates (now a standard REST endpoint, not SSE)
 router.get('/:orderId/updates', orderController.getOrderUpdates);
 
 // Assign driver to order

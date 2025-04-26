@@ -336,6 +336,30 @@ const OrderSummary: React.FC = () => {
     setIsProcessingOrder(true);
 
     try {
+      // Create a modified version of fullRestaurantData with coordinates limited to 7 decimal points
+      let restaurantWithLimitedCoords = null;
+      if (fullRestaurantData) {
+        restaurantWithLimitedCoords = {
+          ...fullRestaurantData
+        };
+        
+        // Check if restaurant has location with coordinates
+        if (restaurantWithLimitedCoords.restaurantInfo?.location?.coordinates?.length === 2) {
+          // Deep clone and modify the coordinates to 7 decimal places
+          restaurantWithLimitedCoords.restaurantInfo = {
+            ...restaurantWithLimitedCoords.restaurantInfo,
+            location: {
+              ...restaurantWithLimitedCoords.restaurantInfo.location,
+              type: "Point", // Ensure type is "Point" as shown in the image
+              coordinates: [
+                Number(restaurantWithLimitedCoords.restaurantInfo.location.coordinates[0].toFixed(7)),
+                Number(restaurantWithLimitedCoords.restaurantInfo.location.coordinates[1].toFixed(7))
+              ]
+            }
+          };
+        }
+      }
+      
       // Create order data according to the Order model structure
       const orderData = {
         orderId: generatedOrderNumber,
@@ -358,7 +382,7 @@ const OrderSummary: React.FC = () => {
           name: 'Guest',
           email: 'guest@example.com'
         },
-        restaurant: fullRestaurantData || {
+        restaurant: restaurantWithLimitedCoords || {
           _id: restaurantId,
           restaurantName: restaurantName,
           name: restaurantName
@@ -393,8 +417,8 @@ const OrderSummary: React.FC = () => {
         paymentMethod: 'card',
         deliveryAddress: deliveryAddress,
         deliveryLocation: {
-          latitude: locationCoordinates?.latitude || 0,
-          longitude: locationCoordinates?.longitude || 0
+          latitude: locationCoordinates ? Number(locationCoordinates.latitude.toFixed(7)) : 0,
+          longitude: locationCoordinates ? Number(locationCoordinates.longitude.toFixed(7)) : 0
         }
       };
 

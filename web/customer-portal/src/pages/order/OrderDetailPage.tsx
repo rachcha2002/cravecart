@@ -67,7 +67,6 @@ const OrderDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [sseConnected, setSseConnected] = useState<boolean>(false);
   const sseRef = useRef<EventSource | null>(null);
   
   // Function to fetch order details
@@ -155,7 +154,7 @@ const OrderDetailPage: React.FC = () => {
     }
   }, [id, fetchOrderDetails]);
 
-  // Set up direct SSE connection for real-time order updates
+  // Effect for cleanup of SSE
   useEffect(() => {
     if (!id) return;
     
@@ -165,33 +164,7 @@ const OrderDetailPage: React.FC = () => {
       sseRef.current = null;
     }
     
-    // Subscribe to order updates
-    const eventSource = orderService.subscribeToOrderUpdates(id, (data) => {
-      // Update the order details
-      if (data.orderData) {
-        fetchOrderDetails(id);
-        
-        // Update last updated timestamp
-        setLastUpdated(new Date());
-        
-        // Mark that we have an active SSE connection
-        setSseConnected(true);
-      }
-    });
-    
-    // Store the event source for cleanup
-    if (eventSource) {
-      sseRef.current = eventSource;
-      
-      // Set up event handlers
-      eventSource.onopen = () => {
-        setSseConnected(true);
-      };
-      
-      eventSource.onerror = () => {
-        setSseConnected(false);
-      };
-    }
+    // No need to set up SSE anymore - don't try to set socketConnected from here
     
     // Clean up on unmount
     return () => {
@@ -200,27 +173,27 @@ const OrderDetailPage: React.FC = () => {
         sseRef.current = null;
       }
     };
-  }, [id, fetchOrderDetails]);
+  }, [id]);
   
-  // Only set up socket and polling as fallbacks if SSE is not connected
+  // Set up socket and polling as primary methods
   useEffect(() => {
     let pollingInterval: NodeJS.Timeout | null = null;
     
-    // Only start polling if both SSE and socket are disconnected
-    if (!sseConnected && !socketConnected && id) {
-      // Poll every 15 seconds
+    // Start polling if socket is disconnected
+    if (!socketConnected && id) {
+      // Poll every 10 seconds
       pollingInterval = setInterval(() => {
         fetchOrderDetails(id);
-      }, 15000);
+      }, 10000);
     }
     
-    // Clean up interval on unmount or when either connection reconnects
+    // Clean up interval on unmount or when socket reconnects
     return () => {
       if (pollingInterval) {
         clearInterval(pollingInterval);
       }
     };
-  }, [sseConnected, socketConnected, id, fetchOrderDetails]);
+  }, [socketConnected, id, fetchOrderDetails]);
   
   // Initial order fetch
   useEffect(() => {
@@ -292,23 +265,21 @@ const OrderDetailPage: React.FC = () => {
     return colors[index];
   };
 
-  // Connection status indicator with SSE support
+  // Connection status indicator without SSE support
   const ConnectionStatusIndicator = () => (
     <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-4">
       <div className="flex items-center">
         <div className="relative w-3 h-3 rounded-full mr-2 bg-gray-300">
-          <div className={`absolute inset-0 rounded-full ${sseConnected ? 'bg-green-500' : socketConnected ? 'bg-blue-500' : 'bg-red-500'}`}></div>
-          {(sseConnected || socketConnected) && (
-            <span className="animate-ping absolute inset-0 rounded-full bg-green-400 opacity-75"></span>
+          <div className={`absolute inset-0 rounded-full ${socketConnected ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+          {socketConnected && (
+            <span className="animate-ping absolute inset-0 rounded-full bg-blue-400 opacity-75"></span>
           )}
         </div>
         <div>
           <p className="text-sm font-medium dark:text-white">
-            {sseConnected 
-              ? 'Direct Updates Active' 
-              : socketConnected 
-                ? 'Socket Updates Active' 
-                : 'Updates Offline'}
+            {socketConnected 
+              ? 'Socket Updates Active' 
+              : 'Updates Offline'}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Last updated: {lastUpdated.toLocaleTimeString()}
@@ -316,10 +287,10 @@ const OrderDetailPage: React.FC = () => {
         </div>
       </div>
       <div className="flex items-center space-x-2">
-        {!sseConnected && !socketConnected && (
+        {!socketConnected && (
           <button 
             onClick={() => {
-              // Try to reconnect both socket and SSE
+              // Try to reconnect socket
               reconnectSocket();
               // Also refresh the order details
               refreshOrder();

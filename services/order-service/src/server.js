@@ -40,45 +40,6 @@ const io = new Server(server, {
 // Make io accessible across the application
 app.set('io', io);
 
-// Initialize SSE clients storage with cleanup interval
-const sseClients = {};
-app.set('sse-clients', sseClients);
-
-// Check and clean up abandoned SSE connections
-const cleanupSSEConnections = () => {
-  const sseClients = app.get('sse-clients') || {};
-  let disconnectedClients = 0;
-  
-  // Iterate through each order's clients
-  Object.keys(sseClients).forEach(orderId => {
-    const orderClients = sseClients[orderId];
-    
-    // Check each client for this order
-    Object.keys(orderClients).forEach(clientId => {
-      const client = orderClients[clientId];
-      
-      // Check if the connection is still active
-      if (!client || client.socket.destroyed) {
-        delete orderClients[clientId];
-        disconnectedClients++;
-      }
-    });
-    
-    // Clean up empty order entries
-    if (Object.keys(orderClients).length === 0) {
-      delete sseClients[orderId];
-    }
-  });
-  
-  // Only log if we actually cleaned something
-  if (disconnectedClients > 0) {
-    console.log(`Cleaned up ${disconnectedClients} abandoned SSE connections`);
-  }
-};
-
-// Run cleanup every 5 minutes
-setInterval(cleanupSSEConnections, 5 * 60 * 1000);
-
 // Create a dedicated namespace for customer order updates with middleware
 const customerNamespace = io.of('/customer-updates');
 
@@ -226,10 +187,7 @@ app.get('/health', (req, res) => {
     serverTime: new Date().toISOString(),
     connections: {
       socket: Object.keys(io.sockets.sockets).length,
-      customerNamespace: Object.keys(customerNamespace.sockets).length,
-      sse: Object.keys(app.get('sse-clients') || {}).reduce((count, orderId) => {
-        return count + Object.keys(app.get('sse-clients')[orderId]).length;
-      }, 0)
+      customerNamespace: Object.keys(customerNamespace.sockets).length
     }
   });
 });
