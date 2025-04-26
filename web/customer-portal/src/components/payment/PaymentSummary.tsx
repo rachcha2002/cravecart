@@ -7,9 +7,11 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js';
-import { useCart } from '../../hooks/useCart';
+import { useCart } from '../../contexts/CartContext';
 import paymentService from '../../services/paymentService';
 import orderService from '../../services/orderService';
+import { formatCurrency } from '../../utils/priceCalculator';
+import { toast } from 'react-hot-toast';
 
 // Define options for CardElement with better styling
 const CARD_ELEMENT_OPTIONS = {
@@ -48,31 +50,45 @@ const PaymentForm = () => {
   const location = useLocation();
   const stripe = useStripe();
   const elements = useElements();
-  const { items, totalAmount, clearCart } = useCart();
+  const { items, clearCart, addItem, restoreCart } = useCart();
 
-  // FIXED AMOUNT for all payments in LKR
-  const FIXED_AMOUNT = 1000; // 1000 LKR - must be a number
-  const FIXED_CURRENCY = 'lkr'; // Must be lowercase for Stripe
+  // Get the calculated price from location.state if available
+  const calculatedOrderData = location.state?.orderData;
+  const calculatedOrderTotal = location.state?.orderTotal;
+  const orderNumber = location.state?.orderNumber;
+
+  // Calculate exchange rate (in a real app, this would come from an API)
+  const USD_TO_LKR_RATE = 325; // Example conversion rate
+  // Calculate payment amount based on the total from price breakdown
+  const PAYMENT_AMOUNT = calculatedOrderTotal 
+    ? Math.round(calculatedOrderTotal * USD_TO_LKR_RATE) 
+    : 1000; // Fallback to fixed amount
+  const PAYMENT_CURRENCY = 'lkr'; // Must be lowercase for Stripe
+
+  // Log state data to ensure we're getting the right information
+  useEffect(() => {
+    if (calculatedOrderData) {
+      // Console log removed
+    }
+  }, [calculatedOrderData]);
 
   // Create a payment intent once
   useEffect(() => {
     // Skip if already initialized or successful
     if (paymentInitialized || paymentSuccess) return;
 
-    const orderFromState = location.state?.orderData;
-    const randomOrderId = `ORD-${Math.floor(Math.random() * 100000)}`;
-    
-    // Create order data from cart or location state - ALWAYS USE FIXED AMOUNT
+    // Create order data from cart or location state - Use calculated amount if available
     const orderDetails = {
-      orderId: orderFromState?.orderId || randomOrderId,
-      amount: FIXED_AMOUNT, // Fixed amount of 1000 LKR
-      currency: FIXED_CURRENCY,
-      customerEmail: orderFromState?.customerEmail || localStorage.getItem('userEmail') || 'customer@example.com',
-      customerName: orderFromState?.customerName || localStorage.getItem('userName') || 'Customer',
-      items: items // Include items for display purposes only
+      orderId: orderNumber || `ORD-${Math.floor(Math.random() * 100000)}`,
+      amount: PAYMENT_AMOUNT,
+      currency: PAYMENT_CURRENCY,
+      customerEmail: localStorage.getItem('userEmail') || 'customer@example.com',
+      customerName: localStorage.getItem('userName') || 'Customer',
+      items: calculatedOrderData?.items || items, // Prefer items from order data
+      calculatedOrderData: calculatedOrderData, // Include the complete price breakdown
+      restaurantName: calculatedOrderData?.restaurantName,
+      deliveryAddress: calculatedOrderData?.deliveryAddress
     };
-    
-    console.log('Creating payment with fixed amount:', FIXED_AMOUNT, FIXED_CURRENCY);
     
     setOrderData(orderDetails);
 
@@ -84,9 +100,12 @@ const PaymentForm = () => {
         // Mark as initialized immediately to prevent duplicate calls
         setPaymentInitialized(true);
         
-        console.log('Creating payment intent with:', orderDetails);
+        // Console log removed
+        
+        // Check if payment service is available
+        try {
         const result = await paymentService.createPaymentIntent(orderDetails);
-        console.log('Payment intent created:', result);
+        // Console log removed
         
         if (result && result.clientSecret) {
           setClientSecret(result.clientSecret);
@@ -94,17 +113,29 @@ const PaymentForm = () => {
           
           // If the server returns a message about using an existing intent, log it
           if (result.message) {
-            console.log('Server message:', result.message);
+            // Console log removed
           }
         } else {
-          throw new Error(result.message || 'Invalid response from payment service');
+            throw new Error(result?.message || 'Invalid response from payment service');
+          }
+        } catch (paymentServiceError: any) {
+          console.error('Payment service error:', paymentServiceError);
+          
+          // If in development mode, create a fake client secret for testing
+          if (process.env.NODE_ENV === 'development') {
+            // Console log removed
+            setClientSecret('fake_client_secret_for_development');
+            setPaymentIntentId('fake_payment_intent_id');
+          } else {
+            throw paymentServiceError;
+          }
         }
       } catch (error: any) {
         console.error('Failed to create payment intent:', error);
         
         // Check if it's a 409 conflict (another request in progress)
         if (error.response && error.response.status === 409) {
-          console.log('Another payment request is in progress, retrying in 2 seconds...');
+          // Console log removed
           
           // Reset the initialized flag and retry after a delay
           setTimeout(() => {
@@ -125,7 +156,7 @@ const PaymentForm = () => {
       createIntent();
     }
     
-  }, [location.state, navigate, paymentSuccess, paymentInitialized, clientSecret]);
+  }, [location.state, navigate, paymentSuccess, paymentInitialized, clientSecret, calculatedOrderData, calculatedOrderTotal, orderNumber, PAYMENT_AMOUNT, items]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -145,7 +176,13 @@ const PaymentForm = () => {
       setIsProcessing(true);
       setPaymentError(null);
 
-      console.log('Confirming payment with secret:', clientSecret);
+      // For development mode, bypass actual payment confirmation
+      if (process.env.NODE_ENV === 'development' && clientSecret === 'fake_client_secret_for_development') {
+        // Remove development bypass logging
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing
+        await handlePaymentSuccess({ id: 'fake_payment_intent_id', status: 'succeeded' });
+        return;
+      }
       
       // Confirm the payment with Stripe
       const result = await stripe.confirmCardPayment(clientSecret, {
@@ -166,8 +203,6 @@ const PaymentForm = () => {
         return_url: window.location.origin + '/payment/success'  // Important for 3D Secure
       });
 
-      console.log('Payment confirmation result:', result);
-
       if (result.error) {
         console.error('Payment error:', result.error);
         
@@ -175,9 +210,9 @@ const PaymentForm = () => {
           // Update order payment status to 'failed' for card errors
           if (orderData.orderId) {
             try {
-              console.log('Updating order payment status to failed for order:', orderData.orderId);
+              // Remove update logging
               orderService.updatePaymentStatus(orderData.orderId, 'failed')
-                .then(result => console.log('Order payment status updated to failed:', result))
+                .then(result => {/* Remove status update logging */})
                 .catch(error => console.error('Failed to update order payment status to failed:', error));
             } catch (error) {
               console.error('Error updating order payment status to failed:', error);
@@ -191,49 +226,15 @@ const PaymentForm = () => {
           handlePaymentError(result.error.message || 'An error occurred while processing your payment.', true);
         }
       } else if (result.paymentIntent?.status === 'succeeded') {
-        console.log('Payment successful:', result.paymentIntent);
-        
-        try {
-          // Confirm the payment in our backend
-          const confirmation = await paymentService.confirmPayment(paymentIntentId);
-          console.log('Payment confirmed with backend:', confirmation);
-          
-          // Mark payment as successful
-          setPaymentSuccess(true);
-          
-          // Clear the cart after successful payment
-          clearCart();
-          
-          // Update the order payment status to 'completed'
-          if (orderData.orderId) {
-            try {
-              console.log('Updating order payment status to completed for order:', orderData.orderId);
-              const orderUpdateResult = await orderService.updatePaymentStatus(orderData.orderId, 'completed');
-              console.log('Order payment status updated successfully:', orderUpdateResult);
-            } catch (orderUpdateError) {
-              console.error('Failed to update order payment status:', orderUpdateError);
-              // Continue with navigation even if order update fails - payment was successful
-            }
-          }
-          
-          // Navigate to success page
-          navigate('/payment/success', { 
-            state: { 
-              orderData,
-              paymentId: paymentIntentId
-            } 
-          });
-        } catch (confirmError: any) {
-          console.error('Backend confirmation error:', confirmError);
-          handlePaymentError('Payment succeeded but we had trouble confirming it. Please contact support.');
-        }
+        // Remove success logging
+        await handlePaymentSuccess(result.paymentIntent);
       } else if (result.paymentIntent?.status === 'requires_action') {
         // Handle 3D Secure authentication if required
-        console.log('Payment requires 3D Secure authentication');
+        // Remove authentication logging
         setPaymentError('This payment requires additional authentication. Please complete the authentication process.');
       } else {
         // Handle other potential statuses
-        console.log('Payment status:', result.paymentIntent?.status);
+        // Remove status logging
         handlePaymentError(`Payment status: ${result.paymentIntent?.status}. Please try again.`);
       }
     } catch (err: any) {
@@ -249,16 +250,21 @@ const PaymentForm = () => {
     // Always set the error message
     setPaymentError(errorMessage);
     
+    // Get the orderId from location state or orderData
+    const realOrderId = location.state?.orderNumber || orderData?.orderId;
+    
     // Update order payment status to 'failed' for serious errors
-    if (navigateAway && orderData?.orderId) {
+    if (realOrderId) {
       try {
-        console.log('Updating order payment status to failed for order:', orderData.orderId);
-        orderService.updatePaymentStatus(orderData.orderId, 'failed')
+        console.log('Updating order payment status to failed for order:', realOrderId);
+        orderService.updatePaymentStatus(realOrderId, 'failed')
           .then(result => console.log('Order payment status updated to failed:', result))
           .catch(error => console.error('Failed to update order payment status to failed:', error));
       } catch (error) {
         console.error('Error updating order payment status to failed:', error);
       }
+    } else {
+      console.error('No orderId found to update payment status to failed');
     }
     
     // For serious errors, navigate to the failed payment page
@@ -266,12 +272,83 @@ const PaymentForm = () => {
       navigate('/payment/failed', {
         state: {
           error: errorMessage,
-          orderId: orderData?.orderId
+          orderId: realOrderId || orderData?.orderId
         }
       });
     }
     // Otherwise the error will be displayed inline
   };
+
+  // On successful payment, prepare complete data for the success page
+  const handlePaymentSuccess = async (paymentIntentResult: any) => {
+    try {
+      // Confirm the payment in our backend
+      const confirmation = await paymentService.confirmPayment(paymentIntentId);
+      
+      // Mark payment as successful
+      setPaymentSuccess(true);
+      
+      // Clear the cart only after successful payment
+      clearCart();
+      
+      // Also clear the pendingCart from localStorage
+      localStorage.removeItem('pendingCart');
+      
+      // Get the orderId from location state or orderData
+      const realOrderId = location.state?.orderNumber || orderData?.orderId;
+      
+      // Update the order payment status to 'completed'
+      if (realOrderId) {
+        try {
+          const orderUpdateResult = await orderService.updatePaymentStatus(realOrderId, 'completed');
+        } catch (orderUpdateError) {
+          console.error('Failed to update order payment status:', orderUpdateError);
+          // Continue with navigation even if order update fails - payment was successful
+          toast.error('Payment successful but order status update failed. Please contact support.');
+        }
+      } else {
+        console.error('No orderId found to update payment status');
+        toast.error('Payment successful but order reference not found. Please contact support.');
+      }
+      
+      // Navigate to success page with complete order data
+      navigate('/payment/success', { 
+        state: { 
+          orderData,
+          paymentId: paymentIntentId,
+          orderNumber: realOrderId || orderNumber,
+          orderTotal: calculatedOrderTotal,
+          calculatedOrderData: calculatedOrderData,
+          paymentAmount: PAYMENT_AMOUNT,
+          paymentCurrency: PAYMENT_CURRENCY
+        } 
+      });
+    } catch (confirmError: any) {
+      console.error('Backend confirmation error:', confirmError);
+      handlePaymentError('Payment succeeded but we had trouble confirming it. Please contact support.');
+    }
+  };
+
+  // Add useEffect to handle cart recovery
+  useEffect(() => {
+    // Check if we have a pendingCart in localStorage (user might have navigated back)
+    const pendingCart = localStorage.getItem('pendingCart');
+    
+    // If there's a pending cart and our current cart is empty, restore it
+    if (pendingCart && items.length === 0) {
+      try {
+        const parsedCart = JSON.parse(pendingCart);
+        // Remove cart restore logging
+        
+        // Use the new restoreCart function to restore the entire cart at once
+        restoreCart(parsedCart);
+        
+        toast.success('Your cart has been restored');
+      } catch (e) {
+        console.error('Error restoring cart:', e);
+      }
+    }
+  }, []);
 
   // Display amounts in LKR format
   const formatLKR = (amount: number) => {
@@ -279,93 +356,100 @@ const PaymentForm = () => {
   };
 
   // For displaying order items (convert USD to LKR for display)
-  const displayItemPrice = (priceUSD: number, quantity: number) => {
+  const displayItemPrice = (priceUSD: number, quantity: number = 1) => {
     // Simple conversion for display purposes
     const priceLKR = Math.round(priceUSD * 300 * quantity); // Approximate USD to LKR conversion
     return formatLKR(priceLKR);
   };
 
   return (
-    <div className="max-w-lg mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+    <div className="bg-white rounded-lg shadow-lg p-6 dark:bg-gray-800">
+      {/* Order Summary Section */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4 dark:text-white">Order Summary</h2>
-        <div className="border-t border-b border-gray-200 dark:border-gray-700 py-4 space-y-3">
-          {items.map((item) => (
-            <div key={item.id} className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 text-xs font-medium px-2 py-1 rounded-full">{item.quantity}x</span>
-                <span className="dark:text-gray-300">{item.name}</span>
-              </div>
-              <span className="dark:text-white font-medium">{displayItemPrice(item.price, item.quantity)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 space-y-2">
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-            <span className="dark:text-white">{formatLKR(totalAmount * 300)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">Tax (8%)</span>
-            <span className="dark:text-white">{formatLKR(totalAmount * 0.08 * 300)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
-            <span className="dark:text-white">{formatLKR(300)}</span>
-          </div>
-          <div className="flex justify-between font-bold mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-lg">
-            <span className="dark:text-white">Total</span>
-            <span className="text-primary-600 dark:text-primary-400">
-              {formatLKR(FIXED_AMOUNT)}
-            </span>
-            </div>
-          <div className="pt-2 text-xs text-right text-gray-500 dark:text-gray-400">
-            <span>* Fixed price checkout: {formatLKR(FIXED_AMOUNT)}</span>
-          </div>
-        </div>
+        <h2 className="text-xl font-semibold mb-4 dark:text-white">Order Summary</h2>
+        
+        {calculatedOrderData && calculatedOrderData.priceBreakdown ? (
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-300">Food Subtotal</span>
+              <span className="font-medium dark:text-white">${formatCurrency(calculatedOrderData.foodSubtotal)}</span>
             </div>
             
-      <form onSubmit={handleSubmit} className="mt-6">
-        <div className="mb-6">
-          <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-            Card Details
-          </label>
-          <div className="border border-gray-300 dark:border-gray-600 p-4 rounded-lg bg-white dark:bg-gray-700 shadow-inner transition-all hover:border-primary-500 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-300">Delivery Fee</span>
+              <span className="font-medium dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.totalDeliveryFee)}</span>
+            </div>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-300">Service & Tax</span>
+              <span className="font-medium dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.serviceFee + calculatedOrderData.priceBreakdown.tax)}</span>
+            </div>
+            
+            <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold dark:text-white">Total</span>
+                <div className="text-right">
+                  <div className="font-bold text-lg dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.total)}</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Rs. {(calculatedOrderData.priceBreakdown.total * USD_TO_LKR_RATE).toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+              <span className="dark:text-white">{formatLKR(PAYMENT_AMOUNT * 0.85)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+              <span className="dark:text-white">{formatLKR(PAYMENT_AMOUNT * 0.07)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Service & Tax</span>
+              <span className="dark:text-white">{formatLKR(PAYMENT_AMOUNT * 0.08)}</span>
+            </div>
+            <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between font-semibold">
+                <span className="dark:text-white">Total</span>
+                <span className="text-primary-600 dark:text-primary-400">
+                  {formatLKR(PAYMENT_AMOUNT)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Payment Form */}
+      <h2 className="text-xl font-semibold mb-4 dark:text-white">Payment Details</h2>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="border border-gray-300 dark:border-gray-600 p-4 rounded-md">
             <CardElement options={CARD_ELEMENT_OPTIONS} />
           </div>
+        
           {paymentError && (
-            <div className="text-red-500 text-sm mt-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+          <div className="text-red-500 p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-sm">
               {paymentError}
             </div>
           )}
-              </div>
               
         <button
           type="submit"
-          disabled={!stripe || isProcessing || !clientSecret || paymentSuccess}
-          className={`w-full py-4 px-6 bg-primary-600 text-white rounded-lg font-semibold text-base transition-all shadow-lg shadow-primary-600/20
-                    ${(!stripe || isProcessing || !clientSecret || paymentSuccess) 
-                      ? 'opacity-60 cursor-not-allowed' 
-                      : 'hover:bg-primary-700 hover:shadow-primary-700/30'}`}
+          disabled={!stripe || isProcessing}
+          className="w-full py-3 px-4 bg-primary-600 text-white rounded-md shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
         >
           {isProcessing ? (
-            <div className="flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-              Processing...
-            </div>
-          ) : paymentSuccess ? (
-            <div className="flex items-center justify-center">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Payment Successful
+            <div className="flex items-center space-x-2">
+              <div className="w-5 h-5 border-t-2 border-b-2 border-white rounded-full animate-spin"></div>
+              <span>Processing...</span>
               </div>
           ) : (
-            <div className="flex items-center justify-center">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              Pay {formatLKR(FIXED_AMOUNT)}
+              <span>Complete Order</span>
             </div>
           )}
             </button>
@@ -394,7 +478,7 @@ const PaymentSummary = () => {
           throw new Error('No publishable key returned from server');
         }
         
-        console.log('Loading Stripe with key:', stripeConfig.publishableKey.substring(0, 10) + '...');
+        // Remove publishable key logging
         const stripeInstance = await loadStripe(stripeConfig.publishableKey);
         
         if (!stripeInstance) {
@@ -407,12 +491,12 @@ const PaymentSummary = () => {
         
         // Try hardcoded key as fallback (this is only for development)
         try {
-          console.log('Attempting to load Stripe with hardcoded key');
+          // Remove fallback logging
           const hardcodedKey = 'pk_test_51RFf3THsCzKYEOA9CjWeShqLww38lou7qbkfI4Z4hJpsuvB36qyNwje4y6qHyuPISY0emyW21kJVImnQojYSDYvp00kDL5H1mu';
           const stripeInstance = await loadStripe(hardcodedKey);
           
           if (stripeInstance) {
-            console.log('Loaded Stripe with hardcoded key');
+            // Remove success logging
             setStripePromise(stripeInstance);
             setLoadError(null);
             return;

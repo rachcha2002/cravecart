@@ -97,7 +97,7 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
         />
       </div>
       <div className="p-4">
-        <h2 className="text-xl font-semibold mb-2">{restaurant.name}</h2>
+        <h2 className="text-xl font-semibold mb-2">{restaurant.restaurantInfo?.restaurantName || restaurant.name}</h2>
         <p className="text-gray-600 text-sm mb-3">
           {restaurant.restaurantInfo?.description?.slice(0, 100) || 'No description available'}
           {restaurant.restaurantInfo?.description?.length > 100 ? '...' : ''}

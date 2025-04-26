@@ -44,21 +44,21 @@ app.set('io', io);
 const sseClients = {};
 app.set('sse-clients', sseClients);
 
-// Set up periodic cleanup of abandoned SSE connections (every 10 minutes)
-setInterval(() => {
-  const clients = app.get('sse-clients');
+// Check and clean up abandoned SSE connections
+const cleanupSSEConnections = () => {
+  const sseClients = app.get('sse-clients') || {};
   let disconnectedClients = 0;
   
-  // Check each order's clients
-  Object.keys(clients).forEach(orderId => {
-    const orderClients = clients[orderId];
+  // Iterate through each order's clients
+  Object.keys(sseClients).forEach(orderId => {
+    const orderClients = sseClients[orderId];
     
     // Check each client for this order
     Object.keys(orderClients).forEach(clientId => {
       const client = orderClients[clientId];
       
-      // Check if the client is still writable
-      if (client.writableEnded || !client.writable) {
+      // Check if the connection is still active
+      if (!client || client.socket.destroyed) {
         delete orderClients[clientId];
         disconnectedClients++;
       }
@@ -66,14 +66,18 @@ setInterval(() => {
     
     // Clean up empty order entries
     if (Object.keys(orderClients).length === 0) {
-      delete clients[orderId];
+      delete sseClients[orderId];
     }
   });
   
+  // Only log if we actually cleaned something
   if (disconnectedClients > 0) {
     console.log(`Cleaned up ${disconnectedClients} abandoned SSE connections`);
   }
-}, 10 * 60 * 1000); // 10 minutes
+};
+
+// Run cleanup every 5 minutes
+setInterval(cleanupSSEConnections, 5 * 60 * 1000);
 
 // Create a dedicated namespace for customer order updates with middleware
 const customerNamespace = io.of('/customer-updates');
@@ -110,13 +114,10 @@ customerNamespace.use((socket, next) => {
 
 // Customer namespace connection handler
 customerNamespace.on('connection', (socket) => {
-  console.log('Customer connected to dedicated namespace:', socket.id, 'User ID:', socket.userId);
-  
   // Join customer-specific room automatically using the authenticated user ID
   const customerId = socket.userId;
   if (customerId) {
     socket.join(`customer-${customerId}`);
-    console.log(`Customer ${customerId} joined dedicated namespace automatically`);
     
     // Send confirmation to client
     socket.emit('connection-established', {
@@ -131,7 +132,6 @@ customerNamespace.on('connection', (socket) => {
     
     const roomName = `customer-${customerId}`;
     socket.join(roomName);
-    console.log(`Customer ${customerId} joined room: ${roomName}`);
     socket.emit('joined-customer', { customerId, success: true });
   });
   
@@ -141,7 +141,6 @@ customerNamespace.on('connection', (socket) => {
     
     const roomName = `order-${orderId}`;
     socket.join(roomName);
-    console.log(`Client ${socket.id} joining order room: ${roomName}`);
     
     // Send confirmation
     socket.emit('joined-order', {
@@ -149,11 +148,6 @@ customerNamespace.on('connection', (socket) => {
       success: true,
       message: `Successfully joined order room ${orderId}`
     });
-  });
-  
-  // Handle disconnect with reason logging
-  socket.on('disconnect', (reason) => {
-    console.log(`Customer disconnected from namespace (${reason}):`, socket.id);
   });
   
   // Handle errors
@@ -167,37 +161,26 @@ app.set('customerIo', customerNamespace);
 
 // Main socket.IO connection handler (for backward compatibility)
 io.on('connection', (socket) => {
-  console.log('Client connected to main namespace:', socket.id);
-  
   // Join restaurant-specific room when restaurant connects
   socket.on('join-restaurant', (restaurantId) => {
     if (!restaurantId) return;
     
-    console.log(`Restaurant ${restaurantId} joined`);
     socket.join(`restaurant-${restaurantId}`);
     socket.emit('joined-restaurant', { restaurantId, success: true });
   });
   
   // Join customer-specific room
   socket.on('join-customer', (customerId) => {
-    if (!customerId) {
-      console.log('Empty customer ID provided, cannot join room');
-      return;
-    }
+    if (!customerId) return;
     
-    console.log(`Customer ${customerId} joining room in main namespace`);
     socket.join(`customer-${customerId}`);
     socket.emit('joined-customer', { customerId, success: true });
   });
   
   // Join order-specific room
   socket.on('join-order', (orderId) => {
-    if (!orderId) {
-      console.log('Empty order ID provided, cannot join room');
-      return;
-    }
+    if (!orderId) return;
     
-    console.log(`Joining order room: ${orderId}`);
     socket.join(`order-${orderId}`);
     
     // Send confirmation
@@ -206,10 +189,6 @@ io.on('connection', (socket) => {
       success: true, 
       message: `Successfully joined order room for ${orderId}` 
     });
-  });
-  
-  socket.on('disconnect', (reason) => {
-    console.log(`Client disconnected (${reason}):`, socket.id);
   });
 });
 
@@ -232,11 +211,13 @@ app.use(helmet({
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// Add request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-  next();
-});
+// Add request logging middleware - only log in development environment
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+  });
+}
 
 // Simple health check route with additional server info
 app.get('/health', (req, res) => {
@@ -267,12 +248,12 @@ app.use((req, res, next) => {
   });
 });
 
-// Global error handler
+// Handle unhandled errors
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({
+  res.status(500).json({ 
     success: false,
-    message: 'Internal server error'
+    message: 'An unexpected error occurred' 
   });
 });
 

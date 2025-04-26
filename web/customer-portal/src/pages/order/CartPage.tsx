@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { useCart } from '../../hooks/useCart';
-import { addItem } from '../../features/cart/cartSlice';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useCart } from '../../contexts/CartContext';
 import { TrashIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { calculateOrderPrices, formatCurrency } from '../../utils/priceCalculator';
 
 // Dummy food items data
 const dummyFoodItems = [
@@ -38,23 +37,73 @@ const dummyFoodItems = [
 ];
 
 const CartPage: React.FC = () => {
-  const dispatch = useDispatch();
-  const { items, totalAmount, removeItem, updateQuantity, isEmpty } = useCart();
+  const { 
+    items, 
+    removeItem, 
+    updateQuantity, 
+    isEmpty, 
+    total: foodSubtotal,
+    restaurantId
+  } = useCart();
 
-  // Add dummy items to cart on initial load if cart is empty
+  const [priceBreakdown, setPriceBreakdown] = useState<any>(null);
+  const [restaurantLocation, setRestaurantLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [deliveryDistanceKM, setDeliveryDistanceKM] = useState(3.0); // Default distance
+  
+  // Default price calculation parameters
+  const baseDeliveryFee = 2.99;
+  const deliveryPerKmRate = 0.5;
+  const restaurantCommissionRate = 15;
+  const serviceFeeRate = 5;
+
+  const navigate = useNavigate();
+
+  // Get restaurant location
   useEffect(() => {
-    if (isEmpty) {
-      // Add first two dummy items to cart
-      dispatch(addItem({ 
-        item: { ...dummyFoodItems[0], quantity: 1 }, 
-        restaurantId: dummyFoodItems[0].restaurantId 
-      }));
-      dispatch(addItem({ 
-        item: { ...dummyFoodItems[2], quantity: 2 }, 
-        restaurantId: dummyFoodItems[2].restaurantId 
-      }));
+    const fetchRestaurantLocation = async () => {
+      if (restaurantId) {
+        try {
+          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/restaurants/${restaurantId}`);
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            const restaurant = data.data;
+            const location = restaurant.restaurantInfo.location;
+            
+            // Extract coordinates
+            if (location && location.coordinates && location.coordinates.length === 2) {
+              setRestaurantLocation({
+                latitude: location.coordinates[1],
+                longitude: location.coordinates[0]
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching restaurant location:", error);
+        }
+      }
+    };
+    
+    if (restaurantId) {
+      fetchRestaurantLocation();
     }
-  }, [dispatch, isEmpty]);
+  }, [restaurantId]);
+
+  // Calculate price breakdown whenever relevant values change
+  useEffect(() => {
+    if (foodSubtotal > 0) {
+      const prices = calculateOrderPrices({
+        foodSubtotal,
+        deliveryDistanceKM,
+        baseDeliveryFee,
+        deliveryPerKmRate,
+        restaurantCommissionRate,
+        serviceFeeRate
+      });
+      
+      setPriceBreakdown(prices);
+    }
+  }, [foodSubtotal, deliveryDistanceKM, baseDeliveryFee, deliveryPerKmRate, restaurantCommissionRate, serviceFeeRate]);
 
   // Handle quantity update
   const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
@@ -62,11 +111,6 @@ const CartPage: React.FC = () => {
       updateQuantity(itemId, newQuantity);
     }
   };
-
-  // Calculate tax and delivery fee
-  const tax = totalAmount * 0.08; // 8% tax
-  const deliveryFee = 2.99;
-  const orderTotal = totalAmount + tax + deliveryFee;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -77,7 +121,7 @@ const CartPage: React.FC = () => {
           <h2 className="text-xl font-semibold mb-4 dark:text-white">Your cart is empty</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">Add some delicious items to your cart!</p>
           <Link
-            to="/"
+            to="/restaurants"
             className="inline-block px-6 py-3 bg-primary text-white font-medium rounded-md hover:bg-primary/90 transition-colors"
           >
             Browse Restaurants
@@ -95,35 +139,44 @@ const CartPage: React.FC = () => {
                   {items.map((item) => (
                     <div key={item.id} className="py-4 flex items-center">
                       <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="h-full w-full object-cover object-center"
-                        />
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="h-full w-full object-cover object-center"
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">No Image</span>
+                          </div>
+                        )}
                       </div>
                       <div className="ml-4 flex flex-1 flex-col">
                         <div>
                           <div className="flex justify-between text-base font-medium text-gray-900 dark:text-white">
                             <h3>{item.name}</h3>
-                            <p className="ml-4">${(item.price * item.quantity).toFixed(2)}</p>
+                            <p className="ml-4">${(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
                           </div>
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             ${item.price.toFixed(2)} each
+                          </p>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {item.restaurantName}
                           </p>
                         </div>
                         <div className="flex flex-1 items-end justify-between text-sm">
                           <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md">
                             <button
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                              onClick={() => handleUpdateQuantity(item.id, (item.quantity ?? 1) - 1)}
                               className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
                             >
                               <MinusIcon className="h-4 w-4" />
                             </button>
                             <span className="px-4 py-2 text-gray-700 dark:text-gray-200">
-                              {item.quantity}
+                              {item.quantity ?? 1}
                             </span>
                             <button
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                              onClick={() => handleUpdateQuantity(item.id, (item.quantity ?? 1) + 1)}
                               className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
                             >
                               <PlusIcon className="h-4 w-4" />
@@ -143,31 +196,6 @@ const CartPage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            <div className="mt-6">
-              <h2 className="text-xl font-semibold mb-4 dark:text-white">Suggested Items</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {dummyFoodItems.slice(1, 3).map((item) => (
-                  <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-48 w-full object-cover"
-                    />
-                    <div className="p-4">
-                      <h3 className="text-lg font-medium dark:text-white">{item.name}</h3>
-                      <p className="text-gray-600 dark:text-gray-300 mt-1">${item.price.toFixed(2)}</p>
-                      <button
-                        onClick={() => dispatch(addItem({ item: { ...item, quantity: 1 }, restaurantId: item.restaurantId }))}
-                        className="mt-3 w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90 transition-colors"
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="lg:col-span-1">
@@ -176,31 +204,111 @@ const CartPage: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-300">Subtotal</span>
-                  <span className="font-medium dark:text-white">${totalAmount.toFixed(2)}</span>
+                  <span className="font-medium dark:text-white">${formatCurrency(foodSubtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Tax</span>
-                  <span className="font-medium dark:text-white">${tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Delivery Fee</span>
-                  <span className="font-medium dark:text-white">${deliveryFee.toFixed(2)}</span>
-                </div>
-                <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between">
-                    <span className="font-semibold dark:text-white">Total</span>
-                    <span className="font-semibold dark:text-white">${orderTotal.toFixed(2)}</span>
-                  </div>
+                
+                {priceBreakdown && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">Base Delivery Fee</span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.baseDeliveryFee)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        Distance Fee ({deliveryDistanceKM.toFixed(1)} km)
+                      </span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.extraDistanceFee)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">Total Delivery Fee</span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.totalDeliveryFee)}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        Service Fee ({serviceFeeRate}%)
+                      </span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.serviceFee)}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        Restaurant Commission ({restaurantCommissionRate}%)
+                      </span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.restaurantCommission)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">Tax</span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.tax)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-300">Driver Earnings</span>
+                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.driverEarnings)}</span>
+                    </div>
+                    
+                    <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex justify-between">
+                        <span className="font-semibold dark:text-white">Total</span>
+                        <span className="font-semibold dark:text-white">${formatCurrency(priceBreakdown.total)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md my-4 text-sm">
+                <h3 className="font-medium mb-2 dark:text-white">Price Calculation Parameters:</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-gray-600 dark:text-gray-300">Base Fee:</div>
+                  <div className="text-right dark:text-white">${baseDeliveryFee.toFixed(2)}</div>
+                  
+                  <div className="text-gray-600 dark:text-gray-300">Per KM Rate:</div>
+                  <div className="text-right dark:text-white">${deliveryPerKmRate.toFixed(2)}/km</div>
+                  
+                  <div className="text-gray-600 dark:text-gray-300">Free Threshold:</div>
+                  <div className="text-right dark:text-white">3.0 km</div>
+                  
+                  <div className="text-gray-600 dark:text-gray-300">Service Fee Rate:</div>
+                  <div className="text-right dark:text-white">{serviceFeeRate}%</div>
+                  
+                  <div className="text-gray-600 dark:text-gray-300">Commission Rate:</div>
+                  <div className="text-right dark:text-white">{restaurantCommissionRate}%</div>
+                  
+                  <div className="text-gray-600 dark:text-gray-300">Distance:</div>
+                  <div className="text-right dark:text-white">{deliveryDistanceKM.toFixed(1)} km</div>
                 </div>
               </div>
+              
               <Link
                 to="/order/summary"
                 className="mt-6 w-full bg-primary text-white py-3 px-4 rounded-md hover:bg-primary/90 transition-colors inline-block text-center font-medium"
+                onClick={() => {
+                  // Navigate with state to pass price calculation data
+                  navigate("/order/summary", {
+                    state: {
+                      foodSubtotal,
+                      deliveryDistanceKM,
+                      priceBreakdown,
+                      // Add calculation parameters
+                      calculationParams: {
+                        baseDeliveryFee,
+                        deliveryPerKmRate,
+                        restaurantCommissionRate,
+                        serviceFeeRate,
+                        freeDeliveryThreshold: 3.0
+                      }
+                    }
+                  });
+                }}
               >
                 Proceed to Checkout
               </Link>
               <Link
-                to="/"
+                to="/restaurants"
                 className="mt-4 w-full text-gray-600 dark:text-gray-300 py-3 px-4 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors inline-block text-center border border-gray-300 dark:border-gray-600"
               >
                 Continue Shopping

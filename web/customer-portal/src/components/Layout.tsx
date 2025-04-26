@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
-import { useCart } from "../hooks/useCart";
+import { useCart } from "../contexts/CartContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotifications } from "../contexts/NotificationContext";
 import SessionTimer from "./SessionTimer";
