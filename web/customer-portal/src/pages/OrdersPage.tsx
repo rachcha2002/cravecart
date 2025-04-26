@@ -23,17 +23,35 @@ const OrdersPage: React.FC = () => {
         const response = await orderService.getUserOrders();
         
         if (response.success) {
-          const formattedOrders: OrderItemProps[] = response.data.map((order: any) => ({
-            id: order.orderId,
-            restaurantName: order.restaurant?.restaurantInfo?.restaurantName || 'Unknown Restaurant',
-            date: new Date(order.createdAt).toLocaleString(),
-            total: order.total,
-            status: order.status,
-            items: order.foods.map((food: any) => `${food.name} (${food.quantity})`),
-            estimatedDeliveryTime: order.status !== 'delivered' && order.status !== 'cancelled' 
-              ? '30-45 min' 
-              : undefined,
-          }));
+          const formattedOrders: OrderItemProps[] = response.data.map((order: any) => {
+            // Extract restaurant name from various possible paths in the data
+            let restaurantName = 'Unknown Restaurant';
+            
+            if (order.restaurant) {
+              // Try new format first (direct restaurantName property)
+              if (order.restaurant.restaurantName) {
+                restaurantName = order.restaurant.restaurantName;
+              } 
+              // Try name property
+             
+              // Try legacy format (nested in restaurantInfo)
+              else if (order.restaurant.restaurantInfo && order.restaurant.restaurantInfo.restaurantName) {
+                restaurantName = order.restaurant.restaurantInfo.restaurantName;
+              }
+            }
+            
+            return {
+              id: order.orderId,
+              restaurantName: restaurantName,
+              date: new Date(order.createdAt).toLocaleString(),
+              total: order.total,
+              status: order.status,
+              items: order.foods.map((food: any) => `${food.name} (${food.quantity})`),
+              estimatedDeliveryTime: order.status !== 'delivered' && order.status !== 'cancelled' 
+                ? '30-45 min' 
+                : undefined,
+            };
+          });
           
           setOrders(formattedOrders);
         } else {

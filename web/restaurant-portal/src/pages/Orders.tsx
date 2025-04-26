@@ -439,9 +439,9 @@ const Orders: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredOrders.map((order) => (
-            <div key={order._id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-all duration-300">
+            <div key={order._id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-all duration-300 min-h-[420px]">
               <div className="p-5 flex justify-between items-start border-b border-gray-100">
                 <div className="flex items-center space-x-3">
                   <div className="flex-shrink-0 h-10 w-10 bg-[#f29f05]/10 rounded-full flex items-center justify-center">
@@ -457,55 +457,53 @@ const Orders: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-full">
-                  #{order.orderId}
-                </span>
+                <div className="flex flex-col items-end space-y-2">
+                  <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-full">
+                    #{order.orderId}
+                  </span>
+                  <StatusUpdateDropdown 
+                    currentStatus={order.status} 
+                    onStatusChange={(newStatus) => handleUpdateStatus(order.orderId, newStatus)} 
+                  />
+                </div>
               </div>
               
               <div className="p-5">
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-500 mb-2">Order Items</div>
-                  <div className="space-y-2">
-                    {order.foods.slice(0, 3).map((item, idx) => (
+                <div className="mb-6">
+                  <div className="text-sm font-medium text-gray-500 mb-3">Order Items</div>
+                  <div className="space-y-3">
+                    {order.foods.slice(0, 4).map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm">
                         <div className="flex items-center">
                           <span className="bg-[#f29f05]/10 text-[#f29f05] text-xs rounded-full px-2 py-0.5 mr-2 w-6 text-center">
                             {item.quantity}
                           </span>
-                          <span className="truncate max-w-[180px]">{item.name}</span>
+                          <span className="truncate max-w-[220px]">{item.name}</span>
                         </div>
-                        <span className="font-medium">₹{item.price}</span>
+                        <span className="font-medium">Rs. {item.price}</span>
                       </div>
                     ))}
-                    {order.foods.length > 3 && (
+                    {order.foods.length > 4 && (
                       <div className="text-xs text-gray-500 italic mt-1">
-                        +{order.foods.length - 3} more items
+                        +{order.foods.length - 4} more items
                       </div>
                     )}
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center">
                     <svg className="h-4 w-4 text-gray-400 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className="text-sm text-gray-500">{formatDatetime(order.createdAt)}</span>
                   </div>
-                  <div className="font-semibold text-lg">₹{order.total.toFixed(2)}</div>
-                </div>
-                
-                <div className="flex justify-between items-center mb-4">
-                  <div className="text-sm font-medium text-gray-500 mr-2">Status</div>
-                  <StatusUpdateDropdown 
-                    currentStatus={order.status} 
-                    onStatusChange={(newStatus) => handleUpdateStatus(order.orderId, newStatus)} 
-                  />
+                  <div className="font-semibold text-xl">Rs. {order.total.toFixed(2)}</div>
                 </div>
                 
                 <button 
                   onClick={() => handleViewOrder(order)}
-                  className="w-full flex items-center justify-center px-4 py-2.5 border border-[#f29f05] rounded-lg text-[#f29f05] bg-white hover:bg-[#f29f05]/5 font-medium transition-colors duration-300"
+                  className="w-full flex items-center justify-center px-4 py-3 border border-[#f29f05] rounded-lg text-[#f29f05] bg-white hover:bg-[#f29f05]/5 font-medium transition-colors duration-300 mt-auto"
                 >
                   <svg className="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

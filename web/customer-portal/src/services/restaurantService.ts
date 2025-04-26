@@ -2,7 +2,7 @@
 import { RestaurantsResponse, RestaurantResponse } from '../types/restaurant';
 import {  MenuResponse } from '../types/menu';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = `${process.env.REACT_APP_API_URL}/api` || 'http://localhost:3001/api';
 const API_MENU_URL = process.env.REACT_APP_MENU_URL || 'http://localhost:5004/api/menus';
 
 export const restaurantService = {

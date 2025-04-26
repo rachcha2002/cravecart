@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Order } from '../types/order.types';
-import StatusUpdateDropdown from './StatusUpdateDropdown';
+import { formatCurrency, orderStatuses } from '../config/constants';
+import { orderService } from '../services/orderService';
 
 interface OrderDetailsModalProps {
   order: Order | null;
   onClose: () => void;
-  onUpdateStatus?: (orderId: string, newStatus: string) => Promise<void>;
+  onUpdate?: () => void;
 }
 
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, onUpdateStatus }) => {
+const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
+  const [newStatus, setNewStatus] = useState<string>(order?.status || '');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   if (!order) return null;
 
@@ -26,7 +30,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
     return date.toLocaleDateString('en-US', options);
   };
 
-  // Function to get status badge colors
   const getStatusBadgeClasses = (status: string): string => {
     switch (status) {
       case "order-received":
@@ -48,13 +51,37 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return `Rs. ${amount.toFixed(2)}`;
+  const getPaymentStatusClasses = (status: string): string => {
+    switch (status) {
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-yellow-100 text-yellow-800";
+    }
   };
 
-  const handleStatusChange = (newStatus: string) => {
-    if (onUpdateStatus && order) {
-      onUpdateStatus(order.orderId, newStatus);
+  const handleUpdateStatus = async () => {
+    if (newStatus === order.status) return;
+    
+    try {
+      setIsUpdating(true);
+      setError(null);
+      
+      const description = `Order status updated to ${newStatus} by admin`;
+      await orderService.updateOrderStatus(order.orderId, newStatus, description);
+      
+      if (onUpdate) {
+        onUpdate();
+      }
+      
+      onClose();
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      setError('Failed to update order status. Please try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -107,14 +134,36 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                   </p>
                 </div>
               </div>
-                {onUpdateStatus && (
-                <div className="z-20 relative">
-                    <StatusUpdateDropdown
-                      currentStatus={order.status}
-                      onStatusChange={handleStatusChange}
-                    />
-                  </div>
+              
+              {/* Status Update Section */}
+              <div className="z-20 relative">
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={newStatus}
+                    onChange={(e) => setNewStatus(e.target.value)}
+                    className="block w-44 rounded-md border-gray-300 shadow-sm focus:border-[#f29f05] focus:ring-[#f29f05] sm:text-sm"
+                  >
+                    {orderStatuses.map(status => (
+                      <option key={status} value={status}>
+                        {status.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <button
+                    type="button"
+                    onClick={handleUpdateStatus}
+                    disabled={isUpdating || newStatus === order.status}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-[#f29f05] hover:bg-[#f29f05]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#f29f05] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdating ? 'Updating...' : 'Update Status'}
+                  </button>
+                </div>
+                
+                {error && (
+                  <p className="mt-1 text-sm text-red-600">{error}</p>
                 )}
+              </div>
             </div>
           </div>
           
@@ -155,11 +204,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                       <span className="text-xs text-gray-500 uppercase tracking-wider">Payment Status</span>
                       <div className="mt-1 flex items-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          order.paymentStatus === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : order.paymentStatus === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          getPaymentStatusClasses(order.paymentStatus)
                         }`}>
                           {order.paymentStatus}
                         </span>
@@ -206,6 +251,32 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                   </div>
                 </div>
                 
+                {/* Restaurant Section */}
+                <div>
+                  <h4 className="text-base font-medium text-gray-900 flex items-center mb-3">
+                    <svg className="h-5 w-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    Restaurant Information
+                  </h4>
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-4 flex items-center">
+                      <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-medium text-lg">{order.restaurant.name.charAt(0)}</span>
+                      </div>
+                      <div className="ml-4 flex-1">
+                        <div className="font-medium text-gray-900">{order.restaurant.name}</div>
+                        <div className="text-sm text-gray-500 flex items-center mt-1">
+                          <svg className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <span className="font-medium">{order.restaurant.phoneNumber || 'No phone number provided'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 {/* Delivery Section */}
                 <div>
                   <h4 className="text-base font-medium text-gray-900 flex items-center mb-3">
@@ -218,7 +289,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden p-4">
                     <div className="mb-3">
                       <span className="text-xs text-gray-500 uppercase tracking-wider">Delivery Address</span>
-                      <div className="mt-1 text-gray-900">{order.deliveryAddress}</div>
+                      <div className="mt-1 text-gray-900">{order.deliveryAddress || 'No address provided'}</div>
+                    </div>
+                    <div className="mb-3">
+                      <span className="text-xs text-gray-500 uppercase tracking-wider">Delivery Distance</span>
+                      <div className="mt-1 text-gray-900">{order.deliveryDistanceKM.toFixed(2)} km</div>
                     </div>
                     {order.deliveryInstructions && (
                       <div>

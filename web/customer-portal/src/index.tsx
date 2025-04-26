@@ -1,16 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
-import { Toaster } from "react-hot-toast";
 import { store } from "./store/store";
+import { CartProvider } from "./contexts/CartContext";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
-import AuthProvider from "./components/AuthProvider";
 
 // Initialize theme from localStorage
 const theme = localStorage.getItem("theme") || "light";
-document.documentElement.classList.toggle("dark", theme === "dark");
+document.documentElement.setAttribute("data-theme", theme);
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -19,10 +18,9 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <AuthProvider>
+      <CartProvider>
         <App />
-        <Toaster position="top-right" />
-      </AuthProvider>
+      </CartProvider>
     </Provider>
   </React.StrictMode>
 );
