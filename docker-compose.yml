@@ -98,15 +98,19 @@ services:
 
   order-service:
     build:
-      context: ./order-service
+      context: ./services/order-service
       dockerfile: Dockerfile
     environment:
+      - PORT=5003
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - RESTAURANT_SERVICE_URL=${RESTAURANT_SERVICE_URL}
       - USER_SERVICE_URL=${USER_SERVICE_URL}
+      - NODE_ENV=${NODE_ENV:-development}
     ports:
-      - "3003:3000"
+      - "5003:5003"
+    networks:
+      - cravecart-network
     deploy:
       resources:
         limits:
@@ -115,17 +119,28 @@ services:
     depends_on:
       - restaurant-service
       - user-service
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   payment-service:
     build:
-      context: ./payment-service
+      context: ./services/payment-service
       dockerfile: Dockerfile
     environment:
+      - PORT=5002
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
-      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL}
+      - ORDER_SERVICE_URL=http://order-service:5003
+      - STRIPE_SECRET_KEY_RENAMED=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY_RENAMED=${STRIPE_PUBLISHABLE_KEY}
+      - NODE_ENV=${NODE_ENV:-development}
     ports:
-      - "3004:3000"
+      - "5002:5002"
+    networks:
+      - cravecart-network
     deploy:
       resources:
         limits:
@@ -133,6 +148,11 @@ services:
     restart: unless-stopped
     depends_on:
       - order-service
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   delivery-service:
     build:
