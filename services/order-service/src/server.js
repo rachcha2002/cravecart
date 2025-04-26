@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const compression = require('compression');
+const DeliveryRoutes = require('./routes/Delivery-routes'); 
 
 // Load environment variables
 dotenv.config();
@@ -197,6 +198,7 @@ const orderRoutes = require('./routes/order.routes');
 
 // Register routes with base path
 app.use('/api/orders', orderRoutes);
+app.use('/api/deliveries', DeliveryRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
