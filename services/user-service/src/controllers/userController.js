@@ -816,7 +816,7 @@ const verifyDeliveryDocument = async (req, res) => {
         .json({ message: `${documentType} document not found` });
     }
 
-    user.deliveryInfo.documents[documentType].verified = verified;
+    user.deliveryInfo.documents[documentType].verified = true;
     user.updatedAt = Date.now();
 
     await user.save();
@@ -827,6 +827,63 @@ const verifyDeliveryDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("Verify delivery document error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Unverify delivery document (admin only)
+ * @route PATCH /api/users/:id/delivery/documents/:documentType/unverify
+ * @access Private/Admin
+ */
+const unverifyDeliveryDocument = async (req, res) => {
+  try {
+    const { id, documentType } = req.params;
+
+    if (
+      !["driverLicense", "vehicleRegistration", "insurance"].includes(
+        documentType
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "Invalid document type. Must be driverLicense, vehicleRegistration, or insurance",
+      });
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.role !== "delivery") {
+      return res
+        .status(400)
+        .json({ message: "User is not a delivery personnel" });
+    }
+
+    if (
+      !user.deliveryInfo ||
+      !user.deliveryInfo.documents ||
+      !user.deliveryInfo.documents[documentType]
+    ) {
+      return res
+        .status(404)
+        .json({ message: `${documentType} document not found` });
+    }
+
+    user.deliveryInfo.documents[documentType].verified = false;
+    user.updatedAt = Date.now();
+
+    await user.save();
+
+    res.json({
+      message: `${documentType} document unverified successfully`,
+      document: user.deliveryInfo.documents[documentType],
+    });
+  } catch (error) {
+    console.error("Unverify delivery document error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -976,6 +1033,42 @@ const getUserContactInfo = async (req, res) => {
   }
 };
 
+/**
+ * Unverify delivery partner account (admin only)
+ * @route PATCH /api/users/:id/delivery/unverify
+ * @access Private/Admin
+ */
+const unverifyDeliveryPartner = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // if (user.role !== "delivery") {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "User is not a delivery personnel" });
+    // }
+
+    user.isVerified = false;
+    user.updatedAt = Date.now();
+
+    await user.save();
+
+    res.json({
+      message: "Delivery partner account unverified successfully",
+      user: user.toJSON(),
+    });
+  } catch (error) {
+    console.error("Unverify delivery partner error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -998,6 +1091,8 @@ module.exports = {
   updateProfilePicture,
   updateDeliveryDocuments,
   verifyDeliveryDocument,
+  unverifyDeliveryDocument,
+  unverifyDeliveryPartner,
   resetUserPassword,
   createAdmin,
   getUsersByRole,

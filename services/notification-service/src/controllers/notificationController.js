@@ -4,6 +4,10 @@ const axios = require("axios");
 const winston = require("winston");
 const { sendNotificationEmail } = require("../services/emailService");
 const { sendNotificationSMS } = require("../services/smsService");
+const {
+  sendPushNotification,
+  sendMulticastPushNotification,
+} = require("../services/pushNotificationService");
 
 // Configure logger - minimal version
 const logger = winston.createLogger({
@@ -353,6 +357,61 @@ const createNotification = async (req, res) => {
                 inAppNotification,
                 user.role || "ADMIN"
               );
+              break;
+
+            case "PUSH":
+              // Get user details from user service to get device tokens
+              try {
+                const userResponse = await axios.get(
+                  `${process.env.USER_SERVICE_URL}/users/${user._id}/device-tokens`
+                );
+
+                if (
+                  !userResponse.data.success ||
+                  !userResponse.data.data ||
+                  userResponse.data.data.length === 0
+                ) {
+                  errorMessage = "No device tokens found for user";
+                  break;
+                }
+
+                // Extract just the tokens
+                const deviceTokens = userResponse.data.data.map(
+                  (device) => device.token
+                );
+
+                // Create notification object with additional data
+                const pushNotification = {
+                  title,
+                  message,
+                  actionUrl: actionUrl || null,
+                  actionText: actionText || null,
+                  notificationId: notification._id.toString(),
+                  type:
+                    user.userType === "DELIVERY_PERSON"
+                      ? "delivery"
+                      : "general",
+                };
+
+                // Send to all user's devices
+                const pushResult = await sendMulticastPushNotification(
+                  deviceTokens,
+                  pushNotification
+                );
+                sent = pushResult.successCount > 0;
+
+                if (
+                  pushResult.failureCount > 0 &&
+                  pushResult.successCount === 0
+                ) {
+                  errorMessage = `Failed to send to all ${pushResult.failureCount} devices`;
+                } else if (pushResult.failureCount > 0) {
+                  errorMessage = `Partially failed: ${pushResult.failureCount} devices failed, ${pushResult.successCount} succeeded`;
+                }
+              } catch (error) {
+                errorMessage = `Error fetching device tokens: ${error.message}`;
+                logger.error("Push notification error:", error);
+              }
               break;
 
             default:
@@ -711,6 +770,38 @@ const sendDirectNotification = async (req, res) => {
                 inAppNotification,
                 user.role || "ADMIN"
               );
+              break;
+
+            case "PUSH":
+              if (!user.deviceTokens || user.deviceTokens.length === 0) {
+                errorMessage = "No device tokens found for user";
+                break;
+              }
+
+              // Extract just the tokens
+              const deviceTokens = user.deviceTokens.map(
+                (device) => device.token
+              );
+
+              // Create notification object
+              const pushNotification = {
+                title,
+                message,
+                actionUrl: actionUrl || null,
+                actionText: actionText || null,
+                notificationId: notification._id.toString(),
+                type: "delivery", // or any other type identifier for the rider app
+              };
+
+              // Send to all user's devices
+              const pushResult = await sendMulticastPushNotification(
+                deviceTokens,
+                pushNotification
+              );
+              sent = pushResult.successCount > 0;
+              if (pushResult.failureCount > 0) {
+                errorMessage = `Failed to send to ${pushResult.failureCount} devices`;
+              }
               break;
 
             default:
