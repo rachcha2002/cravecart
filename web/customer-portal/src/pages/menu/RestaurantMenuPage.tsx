@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { restaurantService } from '../../services/restaurantService';
 import { Restaurant } from '../../types/restaurant';
-import { Menu, MenuCategory, MenuItem } from '../../types/menu'
+import { Menu, MenuItem } from '../../types/menu'
 
 interface RouteParams {
   id: string;
@@ -117,7 +117,7 @@ const RestaurantMenuPage: React.FC = () => {
             <Link to="/restaurants" className="inline-block mb-4 text-white hover:underline">
               ← Back to Restaurants
             </Link>
-            <h1 className="text-4xl font-bold text-white mb-2">{restaurant.name}</h1>
+            <h1 className="text-4xl font-bold text-white mb-1">{restaurant.name}</h1>
             <div className="flex items-center space-x-4 text-white">
               <span>{restaurant.restaurantInfo?.cuisine?.join(', ')}</span>
               <span>•</span>
@@ -129,23 +129,23 @@ const RestaurantMenuPage: React.FC = () => {
       
       {/* Restaurant Info and Menu */}
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-8">
+        <div className="flex flex-col md:flex-col gap-4">
           {/* Sidebar - Restaurant Info */}
-          <div className="md:w-1/3">
+          <div className="md:w-full md:mr-4">
             <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-              <h2 className="text-xl font-semibold mb-4">About</h2>
-              <p className="text-gray-700 mb-4">
+              <h2 className="text-xl font-semibold mb-1">About</h2>
+              <p className="text-gray-700 mb-1">
                 {restaurant.restaurantInfo?.description || 'No description available'}
               </p>
               
-              <h3 className="font-medium mt-4 mb-2">Address</h3>
+              <h3 className="font-medium mt-4 mb-1">Address</h3>
               <p className="text-gray-700">{restaurant.address}</p>
               
-              <h3 className="font-medium mt-4 mb-2">Contact</h3>
+              <h3 className="font-medium mt-4 mb-1">Contact</h3>
               <p className="text-gray-700">Phone: {restaurant.phoneNumber}</p>
               <p className="text-gray-700">Email: {restaurant.email}</p>
               
-              <h3 className="font-medium mt-4 mb-2">Hours</h3>
+              <h3 className="font-medium mt-4 mb-1">Hours</h3>
               <p className="text-gray-700">
                 {restaurant.restaurantInfo?.businessHours?.open} - {restaurant.restaurantInfo?.businessHours?.close}
               </p>
@@ -176,7 +176,7 @@ const RestaurantMenuPage: React.FC = () => {
           </div>
           
           {/* Main Content - Menu */}
-          <div className="md:w-2/3">
+          <div className="md:w-full md:ml-4">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold">Menu</h2>
@@ -239,15 +239,15 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
    //const { addToCart } = useCart();
    const [isAdding, setIsAdding] = useState(false);
   return (
-    <div className={`border rounded-lg overflow-hidden flex ${!item.isAvailable ? 'opacity-60' : ''}`}>
+    <div className={`border rounded-lg overflow-hidden flex flex-col h-full ${!item.isAvailable ? 'opacity-60' : ''}`}>
       {/* Image Section */}
       <div>
       {item.imageUrl && (
-        <div className="w-1/3">
+        <div>
           <img 
-            src={item.imageUrl}  
-            alt={item.name} 
-           className="w-full h-full object-cover border border-red-500"
+           src={item.imageUrl}  
+           alt={item.name} 
+           className="w-full h-40 object-cover rounded-md mt-2"
            onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.src = '/default-food.jpg'; // fallback if image fails
@@ -256,10 +256,10 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
         </div>
       )}
       </div>
-      <div className={`p-4 ${item.imageUrl ? 'w-2/3' : 'w-full'}`}>
+      <div className="p-4 flex flex-col flex-grow">
         <div className="flex justify-between items-start">
           <h4 className="font-medium text-lg">{item.name}</h4>
-          <span className="font-semibold">${item.price.toFixed(2)}</span>
+          <span className="font-semibold">Rs. {item.price.toFixed(2)}</span>
         </div>
         <p className="text-gray-600 text-sm mt-1">{item.description}</p>
         
@@ -302,7 +302,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
         </div>
         
         {/* Item Status and Add to Cart Button */}
-        <div className="mt-3 flex justify-between items-center">
+        <div className="mt-4 flex flex-col space-y-2">
             {!item.isAvailable ? (
               <span className="text-red-600 text-sm">Currently unavailable</span>
             ) : (
