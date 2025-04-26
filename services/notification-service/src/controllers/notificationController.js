@@ -4,6 +4,10 @@ const axios = require("axios");
 const winston = require("winston");
 const { sendNotificationEmail } = require("../services/emailService");
 const { sendNotificationSMS } = require("../services/smsService");
+const {
+  sendPushNotification,
+  sendMulticastPushNotification,
+} = require("../services/pushNotificationService");
 
 // Configure logger - minimal version
 const logger = winston.createLogger({
@@ -29,13 +33,6 @@ const setSocketIO = (socketIO) => {
 // In-app notification with minimal logging
 const sendInApp = async (userId, notification, userType) => {
   try {
-    logger.info(
-      `Attempting to send in-app notification to user ${userId} with type ${userType}`
-    );
-
-    // Convert userType to uppercase for consistent mapping
-    const upperUserType = userType ? userType.toUpperCase() : "ADMIN";
-
     // Map user type to appropriate namespace
     const userTypeMap = {
       CUSTOMER: "customer",
@@ -44,25 +41,77 @@ const sendInApp = async (userId, notification, userType) => {
       DELIVERY_PERSON: "delivery",
     };
 
-    const namespace = userTypeMap[upperUserType];
+    const namespace = userTypeMap[userType];
 
-    if (!namespace) {
-      logger.error(
-        `Invalid user type: ${userType} (${upperUserType}). Cannot map to namespace.`,
-        {
-          originalUserType: userType,
-          upperUserType,
-          availableTypes: Object.keys(userTypeMap),
-        }
-      );
-      return false;
+    // ALWAYS mark as sent in the database first
+    await markNotificationAsSent(userId, notification);
+
+    // Try socket delivery if available
+    if (io[namespace]) {
+      // Send the new notification to the appropriate namespace
+      io[namespace].to(userId.toString()).emit("notification", notification);
+
+      // Get the updated unread count
+      const count = await Notification.countDocuments({
+        "receivers.userId": userId,
+        "receivers.receivingData": {
+          $elemMatch: {
+            channel: "IN_APP",
+            status: "SENT",
+            read: false,
+          },
+        },
+      });
+
+      // Send the updated count
+      io[namespace].to(userId.toString()).emit("unreadCount", { count });
+
+      // Note: We don't mark as delivered here because we don't know
+      // if the client actually received it
+      return true;
     }
 
-    // Rest of your function...
+    // Even if socket isn't available, we mark it as SENT
+    return true;
   } catch (error) {
-    // Error handling...
+    logger.error("In-app notification failed:", error.message);
+
+    // Try to mark as sent even if an error occurred
+    try {
+      await markNotificationAsSent(userId, notification);
+      return true;
+    } catch (dbError) {
+      return false;
+    }
   }
 };
+
+// Helper function to mark notification as sent in database
+async function markNotificationAsSent(userId, notification) {
+  // Find the notification document for this user
+  const notificationDoc = await Notification.findOne({
+    "receivers.userId": userId,
+  });
+
+  if (notificationDoc) {
+    // Update the receiver's status for this notification
+    await Notification.updateOne(
+      {
+        _id: notificationDoc._id,
+        "receivers.userId": userId,
+      },
+      {
+        $set: {
+          "receivers.$.receivingData.$[elem].status": "SENT",
+          "receivers.$.receivingData.$[elem].sentAt": new Date(),
+        },
+      },
+      {
+        arrayFilters: [{ "elem.channel": "IN_APP" }],
+      }
+    );
+  }
+}
 
 /**
  * Create and send notifications to users based on their roles
@@ -308,6 +357,61 @@ const createNotification = async (req, res) => {
                 inAppNotification,
                 user.role || "ADMIN"
               );
+              break;
+
+            case "PUSH":
+              // Get user details from user service to get device tokens
+              try {
+                const userResponse = await axios.get(
+                  `${process.env.USER_SERVICE_URL}/users/${user._id}/device-tokens`
+                );
+
+                if (
+                  !userResponse.data.success ||
+                  !userResponse.data.data ||
+                  userResponse.data.data.length === 0
+                ) {
+                  errorMessage = "No device tokens found for user";
+                  break;
+                }
+
+                // Extract just the tokens
+                const deviceTokens = userResponse.data.data.map(
+                  (device) => device.token
+                );
+
+                // Create notification object with additional data
+                const pushNotification = {
+                  title,
+                  message,
+                  actionUrl: actionUrl || null,
+                  actionText: actionText || null,
+                  notificationId: notification._id.toString(),
+                  type:
+                    user.userType === "DELIVERY_PERSON"
+                      ? "delivery"
+                      : "general",
+                };
+
+                // Send to all user's devices
+                const pushResult = await sendMulticastPushNotification(
+                  deviceTokens,
+                  pushNotification
+                );
+                sent = pushResult.successCount > 0;
+
+                if (
+                  pushResult.failureCount > 0 &&
+                  pushResult.successCount === 0
+                ) {
+                  errorMessage = `Failed to send to all ${pushResult.failureCount} devices`;
+                } else if (pushResult.failureCount > 0) {
+                  errorMessage = `Partially failed: ${pushResult.failureCount} devices failed, ${pushResult.successCount} succeeded`;
+                }
+              } catch (error) {
+                errorMessage = `Error fetching device tokens: ${error.message}`;
+                logger.error("Push notification error:", error);
+              }
               break;
 
             default:
@@ -668,6 +772,38 @@ const sendDirectNotification = async (req, res) => {
               );
               break;
 
+            case "PUSH":
+              if (!user.deviceTokens || user.deviceTokens.length === 0) {
+                errorMessage = "No device tokens found for user";
+                break;
+              }
+
+              // Extract just the tokens
+              const deviceTokens = user.deviceTokens.map(
+                (device) => device.token
+              );
+
+              // Create notification object
+              const pushNotification = {
+                title,
+                message,
+                actionUrl: actionUrl || null,
+                actionText: actionText || null,
+                notificationId: notification._id.toString(),
+                type: "delivery", // or any other type identifier for the rider app
+              };
+
+              // Send to all user's devices
+              const pushResult = await sendMulticastPushNotification(
+                deviceTokens,
+                pushNotification
+              );
+              sent = pushResult.successCount > 0;
+              if (pushResult.failureCount > 0) {
+                errorMessage = `Failed to send to ${pushResult.failureCount} devices`;
+              }
+              break;
+
             default:
               errorMessage = `Unsupported channel: ${channel}`;
           }
@@ -812,7 +948,6 @@ const markNotificationAsRead = async (req, res) => {
   }
 };
 
-// Add this function to your notification controller
 // Add this function to your notification controller with enhanced error handling
 const getUnreadNotificationsCount = async (req, res) => {
   let retryCount = 0;
@@ -905,20 +1040,13 @@ const getUnreadNotificationsCount = async (req, res) => {
   return attemptFetchCount();
 };
 
-// Add this function to your notification controller
+// In your notification controller
 const getUnreadNotifications = async (req, res) => {
   try {
     const { userId } = req.params;
     const { limit = 10, page = 1 } = req.query;
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: userId",
-      });
-    }
-
-    // Find unread in-app notifications for this user
+    // Find notifications that are unread
     const notifications = await Notification.find({
       "receivers.userId": userId,
       "receivers.receivingData": {
@@ -932,6 +1060,39 @@ const getUnreadNotifications = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
+
+    // Mark these notifications as delivered if not already
+    for (const notification of notifications) {
+      const receiver = notification.receivers.find(
+        (r) => r.userId.toString() === userId
+      );
+
+      if (receiver) {
+        const inAppChannel = receiver.receivingData.find(
+          (rd) => rd.channel === "IN_APP" && !rd.delivered
+        );
+
+        if (inAppChannel) {
+          // Update delivered status
+          await Notification.updateOne(
+            {
+              _id: notification._id,
+              "receivers.userId": userId,
+              "receivers.receivingData.channel": "IN_APP",
+            },
+            {
+              $set: {
+                "receivers.$.receivingData.$[elem].delivered": true,
+                "receivers.$.receivingData.$[elem].deliveredAt": new Date(),
+              },
+            },
+            {
+              arrayFilters: [{ "elem.channel": "IN_APP" }],
+            }
+          );
+        }
+      }
+    }
 
     const total = await Notification.countDocuments({
       "receivers.userId": userId,

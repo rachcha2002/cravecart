@@ -90,6 +90,20 @@ const userSchema = new mongoose.Schema(
     },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    deviceTokens: [
+      {
+        token: String,
+        platform: {
+          type: String,
+          enum: ["ios", "android", "web"],
+          required: true,
+        },
+        lastUpdated: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
