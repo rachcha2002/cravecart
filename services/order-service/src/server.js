@@ -213,10 +213,10 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Add request logging middleware - only log in development environment
 if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-    next();
-  });
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  next();
+});
 }
 
 // Simple health check route with additional server info
@@ -251,7 +251,7 @@ app.use((req, res, next) => {
 // Handle unhandled errors
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ 
+  res.status(500).json({
     success: false,
     message: 'An unexpected error occurred' 
   });

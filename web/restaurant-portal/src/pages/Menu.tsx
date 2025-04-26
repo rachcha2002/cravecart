@@ -408,7 +408,7 @@ const Menu: React.FC = () => {
               <div className="p-5">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-semibold text-gray-900 truncate">{item.name}</h3>
-                  <div className="font-bold text-lg text-[#f29f05]">₹{item.price.toFixed(2)}</div>
+                  <div className="font-bold text-lg text-[#f29f05]">Rs. {item.price.toFixed(2)}</div>
                 </div>
                 
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2">{item.description}</p>

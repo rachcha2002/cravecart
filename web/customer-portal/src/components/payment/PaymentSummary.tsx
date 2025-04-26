@@ -397,30 +397,30 @@ const PaymentForm = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex justify-between">
+          <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
               <span className="dark:text-white">{formatLKR(PAYMENT_AMOUNT * 0.85)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
               <span className="dark:text-white">{formatLKR(PAYMENT_AMOUNT * 0.07)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Service & Tax</span>
               <span className="dark:text-white">{formatLKR(PAYMENT_AMOUNT * 0.08)}</span>
-            </div>
+          </div>
             <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
               <div className="flex justify-between font-semibold">
-                <span className="dark:text-white">Total</span>
-                <span className="text-primary-600 dark:text-primary-400">
+            <span className="dark:text-white">Total</span>
+            <span className="text-primary-600 dark:text-primary-400">
                   {formatLKR(PAYMENT_AMOUNT)}
-                </span>
+            </span>
               </div>
             </div>
           </div>
         )}
-      </div>
-
+            </div>
+            
       {/* Payment Form */}
       <h2 className="text-xl font-semibold mb-4 dark:text-white">Payment Details</h2>
       <form onSubmit={handleSubmit} className="space-y-6">

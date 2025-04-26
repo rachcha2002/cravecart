@@ -80,7 +80,7 @@ const OrderSummary: React.FC = () => {
       console.log('OrderSummary received state:', passedState);
     }
   }, [passedState]);
-  
+
   // Get restaurant name from first item in cart (they're all from the same restaurant)
   const restaurantName = items.length > 0 ? items[0].restaurantName : '';
 
@@ -140,10 +140,10 @@ const OrderSummary: React.FC = () => {
       // Small delay to prevent immediate redirection
       timeoutId = setTimeout(() => {
         // Only navigate if the component is still mounted and cart is still empty
-        if (isEmpty) {
-          navigate('/restaurants');
-          toast.error('Your cart is empty');
-        }
+    if (isEmpty) {
+      navigate('/restaurants');
+      toast.error('Your cart is empty');
+    }
       }, 500);
     }
     
@@ -243,8 +243,8 @@ const OrderSummary: React.FC = () => {
       setDeliveryDistanceKM(calculatedDistance);
     } else {
       // Fallback to simulated distance
-      const newDistance = Math.round((2 + Math.random() * 6) * 10) / 10; // Between 2 and 8 km
-      setDeliveryDistanceKM(newDistance);
+    const newDistance = Math.round((2 + Math.random() * 6) * 10) / 10; // Between 2 and 8 km
+    setDeliveryDistanceKM(newDistance);
     }
   };
 
@@ -271,7 +271,7 @@ const OrderSummary: React.FC = () => {
       } else {
         // Fallback to simulated distance
         const newDistance = Math.round((2 + Math.random() * 6) * 10) / 10;
-        setDeliveryDistanceKM(newDistance);
+      setDeliveryDistanceKM(newDistance);
       }
     }
   };
@@ -339,10 +339,24 @@ const OrderSummary: React.FC = () => {
       // Create order data according to the Order model structure
       const orderData = {
         orderId: generatedOrderNumber,
-        user: {
-          _id: user?.id || 'guest-user',
-          name: user?.name || 'Guest',
-          email: user?.email || 'guest@example.com'
+        user: user ? {
+          _id: user.id,
+          name: user.name,
+          email: user.email,
+          phoneNumber: user.phoneNumber || '',
+          address: user.address || '',
+          role: user.role || 'customer',
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          // Include all other user properties
+          ...Object.keys(user)
+            .filter(key => !['id', 'name', 'email', 'phoneNumber', 'address', 'role', 'isActive', 'createdAt', 'updatedAt'].includes(key))
+            .reduce((obj, key) => ({ ...obj, [key]: (user as any)[key] }), {})
+        } : {
+          _id: 'guest-user',
+          name: 'Guest',
+          email: 'guest@example.com'
         },
         restaurant: fullRestaurantData || {
           _id: restaurantId,
@@ -370,7 +384,7 @@ const OrderSummary: React.FC = () => {
           companyFee: 0
         },
         // Legacy fields for backward compatibility
-        subtotal: foodSubtotal,
+          subtotal: foodSubtotal,
         deliveryFee: priceBreakdown?.totalDeliveryFee || deliveryFee,
         tax: priceBreakdown?.tax || tax,
         total: priceBreakdown?.total || orderTotal,
@@ -417,7 +431,7 @@ const OrderSummary: React.FC = () => {
           
           // Store cart data in localStorage for recovery if needed
           localStorage.setItem('pendingCart', JSON.stringify(items));
-          
+      
           // Navigate to payment page with the order information
           navigate(`/payment`, { state: paymentState });
           
@@ -432,7 +446,7 @@ const OrderSummary: React.FC = () => {
         // For development - if order service is down, still allow navigation
         if (process.env.NODE_ENV === 'development') {
           console.log("Development mode: continuing to payment despite order error");
-          
+      
           // Store cart data in localStorage for recovery if needed
           localStorage.setItem('pendingCart', JSON.stringify(items));
           
@@ -744,8 +758,8 @@ const OrderSummary: React.FC = () => {
           </div>
           
           <div className="space-y-3">
-            <button 
-              onClick={handleProceedToPayment}
+          <button 
+            onClick={handleProceedToPayment}
               disabled={!addressValidated || isProcessingOrder}
               className={`w-full py-3 rounded-lg font-medium ${
                 !addressValidated
@@ -760,7 +774,7 @@ const OrderSummary: React.FC = () => {
                 : !addressValidated
                   ? 'Please Add Delivery Address'
                   : 'Proceed to Payment'}
-            </button>
+          </button>
             
             <Link
               to="/restaurants"

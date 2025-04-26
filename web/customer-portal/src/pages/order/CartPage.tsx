@@ -240,25 +240,25 @@ const CartPage: React.FC = () => {
                       <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.restaurantCommission)}</span>
                     </div>
                     
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-300">Tax</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-300">Tax</span>
                       <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.tax)}</span>
-                    </div>
+                </div>
                     
-                    <div className="flex justify-between">
+                <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">Driver Earnings</span>
                       <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.driverEarnings)}</span>
-                    </div>
+                </div>
                     
-                    <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex justify-between">
-                        <span className="font-semibold dark:text-white">Total</span>
+                <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between">
+                    <span className="font-semibold dark:text-white">Total</span>
                         <span className="font-semibold dark:text-white">${formatCurrency(priceBreakdown.total)}</span>
                       </div>
                     </div>
                   </>
                 )}
-              </div>
+                  </div>
               
               <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md my-4 text-sm">
                 <h3 className="font-medium mb-2 dark:text-white">Price Calculation Parameters:</h3>
