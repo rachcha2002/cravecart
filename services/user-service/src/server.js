@@ -6,6 +6,7 @@ const { port, serviceName, connectDB } = require("./config");
 // Import routes
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const restaurantRoutes = require("./routes/restaurantRoutes");
 
 // Initialize express app
 const app = express();
@@ -26,6 +27,7 @@ app.get("/health", (req, res) => {
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/restaurants", restaurantRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

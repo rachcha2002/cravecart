@@ -1,36 +1,70 @@
-// services/restaurant.service.ts
-import axios from 'axios';
-import { ApiResponse } from '../types/restaurant';
+// restaurantService.ts
+import { RestaurantsResponse, RestaurantResponse } from '../types/restaurant';
+import {  MenuResponse } from '../types/menu';
 
-export const fetchRestaurants = async (
-  status?: string,
-  isVerified?: boolean,
-  page: number = 1,
-  limit: number = 10
-): Promise<ApiResponse> => {
-  try {
-    const token = localStorage.getItem('userToken');
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-    console.log("Token being used:", token);
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_MENU_URL = process.env.REACT_APP_MENU_URL || 'http://localhost:5004/api/menus';
 
-    const response = await axios.get<ApiResponse>('http://localhost:3001/api/users', {
-      params: {
-        role: 'restaurant',
-        status,
-        isVerified: isVerified !== undefined ? isVerified.toString() : undefined,
-        page,
-        limit
-      },
-      headers: {
-        Authorization: `Bearer ${token}`,
+export const restaurantService = {
+  /**
+   * Get all restaurants
+   * @returns Promise with restaurants data
+   */
+  getAllRestaurants: async (): Promise<RestaurantsResponse> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/restaurants`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch restaurants');
       }
-    });
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get a single restaurant by ID
+   * @param id Restaurant ID
+   * @returns Promise with restaurant data
+   */
+  getRestaurantById: async (id: string): Promise<RestaurantResponse> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/restaurants/${id}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch restaurant');
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`Error fetching restaurant with id ${id}:`, error);
+      throw error;
+    }
+  },
 
-    return response.data;
+  /**
+ * Get menu by restaurant ID
+ * @param restaurantId Restaurant ID
+ * @returns Promise with menu data
+ */
+  getMenuByRestaurantId: async (restaurantId: string): Promise<MenuResponse> => {
+   try {
+    const response = await fetch(`${API_MENU_URL}/getmenus/${restaurantId}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch restaurant menu');
+    }
+    console.log('Menu data:', data); // Log the menu data for debugging
+    return data;
   } catch (error) {
-    console.error("Error fetching restaurants:", error);
+    console.error(`Error fetching menu for restaurant ${restaurantId}:`, error);
     throw error;
   }
+}
 };

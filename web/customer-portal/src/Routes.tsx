@@ -20,6 +20,7 @@ import PaymentSummaryPage from './pages/payment/PaymentSummaryPage';
 import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
 import PaymentFailedPage from './pages/payment/PaymentFailedPage';
 import RestaurantPage from './pages/RestaurantPage';
+import RestaurantMenuPage from './pages/menu/RestaurantMenuPage';
 import PublicRoute from "./components/PublicRoute";
 
 
@@ -49,6 +50,7 @@ const Routes: React.FC = () => {
         />
         
          <Route path='restaurants' element={<RestaurantPage/>}/>
+        <Route path="restaurants/:id" element={<RestaurantMenuPage />} />
 
         <Route
           path="profile"
