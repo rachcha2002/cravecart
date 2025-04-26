@@ -90,8 +90,6 @@ exports.createOrder = async (req, res) => {
         orderData: savedOrder,
         message: 'New order received!'
       });
-      
-      console.log(`New order notification sent to restaurant ${restaurantId}`);
     }
     
     res.status(201).json({
@@ -224,52 +222,33 @@ exports.getOrderUpdates = async (req, res) => {
     //   });
     // }
     
-    // Set headers for Server-Sent Events
+    // Set headers for SSE
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no', // Important for Nginx proxying
-      'Access-Control-Allow-Origin': '*'
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
     });
     
-    // Keep connection alive with a comment every 30 seconds
-    const keepAliveInterval = setInterval(() => {
-      res.write(': keepalive\n\n');
-    }, 30000);
+    // Initial heartbeat
+    res.write('data: {"type":"connected","message":"SSE connection established"}\n\n');
     
-    // Send initial order data
-    const initialData = {
-      type: 'initial',
-      orderId: order.orderId,
-      status: order.status,
-      orderData: order,
-      timestamp: new Date().toISOString()
-    };
-    
-    res.write(`data: ${JSON.stringify(initialData)}\n\n`);
-    
-    // Create a unique client ID
-    const clientId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Store the client's response object
+    // Store client info in app-wide sse-clients object
+    const clientId = req.socket.remoteAddress + '-' + Date.now();
     const clients = req.app.get('sse-clients') || {};
+    
+    // Initialize clients object for this order if it doesn't exist
     if (!clients[orderId]) {
       clients[orderId] = {};
     }
-    clients[orderId][clientId] = res;
-    req.app.set('sse-clients', clients);
     
-    console.log(`Client ${clientId} subscribed to updates for order ${orderId}`);
+    // Store client response object
+    clients[orderId][clientId] = res;
+    
+    // Store the client collection back to app
+    req.app.set('sse-clients', clients);
     
     // Handle client disconnect
     req.on('close', () => {
-      console.log(`Client ${clientId} disconnected from order ${orderId} updates`);
-      
-      // Clear the keepalive interval
-      clearInterval(keepAliveInterval);
-      
-      // Remove client from the clients list
       if (clients[orderId]) {
         delete clients[orderId][clientId];
         
@@ -277,6 +256,19 @@ exports.getOrderUpdates = async (req, res) => {
         if (Object.keys(clients[orderId]).length === 0) {
           delete clients[orderId];
         }
+      }
+    });
+    
+    // Catch any errors in the SSE stream
+    res.on('error', (error) => {
+      console.error('Error in order updates stream:', error);
+      
+      // Try to close the connection
+      try {
+        delete clients[orderId][clientId];
+        res.end();
+      } catch (endError) {
+        console.error('Error ending SSE stream:', endError);
       }
     });
   } catch (error) {
@@ -311,8 +303,6 @@ const formatStatus = (status) => {
 const sendOrderUpdate = (req, orderId, data) => {
   const clients = req.app.get('sse-clients') || {};
   if (!clients[orderId]) return;
-  
-  console.log(`Sending update to ${Object.keys(clients[orderId]).length} clients for order ${orderId}`);
   
   // Add timestamp to the data
   const updateData = {
@@ -376,9 +366,6 @@ const sendNotifications = (req, order, status, description) => {
       if (customerIo) {
         customerIo.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
       }
-      
-      // Also log the successful notification
-      console.log(`Order status update notification sent to customer ${customerId}`);
     }
     
     // 4. Always emit to order-specific room as a fallback

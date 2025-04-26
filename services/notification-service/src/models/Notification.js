@@ -15,7 +15,7 @@ const receiverSchema = new mongoose.Schema({
     {
       channel: {
         type: String,
-        enum: ["SMS", "EMAIL", "IN_APP"],
+        enum: ["SMS", "EMAIL", "IN_APP", "PUSH"],
         required: true,
       },
       status: {
@@ -38,6 +38,12 @@ const receiverSchema = new mongoose.Schema({
         type: String,
         default: null,
       },
+      readAt: Date,
+      delivered: {
+        type: Boolean,
+        default: false,
+      },
+      deliveredAt: Date,
     },
   ],
 });
@@ -54,14 +60,14 @@ const notificationSchema = new mongoose.Schema({
   roles: [
     {
       type: String,
-      enum: ["ADMIN", "CUSTOMER", "RESTAURANT_OWNER", "DELIVERY_PERSON"],
+      enum: ["ADMIN", "CUSTOMER", "RESTAURANT", "DELIVERY"],
       required: true,
     },
   ],
   channels: [
     {
       type: String,
-      enum: ["SMS", "EMAIL", "IN_APP"],
+      enum: ["SMS", "EMAIL", "IN_APP", "PUSH"],
       required: true,
     },
   ],

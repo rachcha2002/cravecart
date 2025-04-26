@@ -8,6 +8,9 @@ interface StatusUpdateDropdownProps {
 const StatusUpdateDropdown: React.FC<StatusUpdateDropdownProps> = ({ currentStatus, onStatusChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Add state to track menu position
+  const [menuPosition, setMenuPosition] = useState<'bottom' | 'top'>('bottom');
 
   const statusOptions = [
     { value: 'order-received', label: 'Order Received' },
@@ -20,6 +23,23 @@ const StatusUpdateDropdown: React.FC<StatusUpdateDropdownProps> = ({ currentStat
   ];
 
   const currentStatusLabel = statusOptions.find(option => option.value === currentStatus)?.label || 'Update Status';
+
+  // Update menu position on open
+  useEffect(() => {
+    if (isOpen && dropdownRef.current && menuRef.current) {
+      // Get dropdown position
+      const dropdownRect = dropdownRef.current.getBoundingClientRect();
+      const menuHeight = menuRef.current.offsetHeight;
+      const viewportHeight = window.innerHeight;
+      
+      // Check if dropdown would go below viewport
+      if (dropdownRect.bottom + menuHeight > viewportHeight) {
+        setMenuPosition('top');
+      } else {
+        setMenuPosition('bottom');
+      }
+    }
+  }, [isOpen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -83,8 +103,11 @@ const StatusUpdateDropdown: React.FC<StatusUpdateDropdownProps> = ({ currentStat
       </div>
 
       {isOpen && (
-        <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-          <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+        <div 
+          ref={menuRef}
+          className={`absolute ${menuPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50`}
+        >
+          <div className="py-1 max-h-60 overflow-y-auto" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
             {statusOptions.map((option) => (
               <button
                 key={option.value}

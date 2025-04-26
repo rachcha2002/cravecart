@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { restaurantService } from '../../services/restaurantService';
 import { Restaurant } from '../../types/restaurant';
+
 import { Menu, MenuCategory, MenuItem } from '../../types/menu'
+import { useCart } from '../../contexts/CartContext';
+
+
 
 interface RouteParams {
   id: string;
@@ -16,7 +20,6 @@ const RestaurantMenuPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
- 
 
   useEffect(() => {
     const fetchRestaurantAndMenu = async () => {
@@ -100,16 +103,17 @@ const RestaurantMenuPage: React.FC = () => {
   // Find the active category
   const currentCategory = menu.categories.find(category => category._id === activeCategory);
 
-  // Hero image - use restaurant profile picture or first image
-  const heroImage = restaurant.profilePicture || 
-    (restaurant.restaurantInfo?.images?.find(img => img.isPrimary)?.url) || 
-    '/default-restaurant.jpg';
+  // Fix the JSX issue by getting the hero image from the restaurant data
+  // Use a default image as fallback
+  const heroImage = restaurant?.restaurantInfo?.images?.find(img => img.isPrimary)?.url || 
+                    restaurant?.profilePicture || 
+                    '/default-restaurant.jpg';
   
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Restaurant Hero Section */}
       <div 
-        className="h-64 bg-cover bg-center" 
+        className="h-64 bg-cover bg-center relative" 
         style={{ backgroundImage: `url(${heroImage})` }}
       >
         <div className="h-full w-full bg-black bg-opacity-50 flex items-end">
@@ -117,11 +121,13 @@ const RestaurantMenuPage: React.FC = () => {
             <Link to="/restaurants" className="inline-block mb-4 text-white hover:underline">
               ← Back to Restaurants
             </Link>
-            <h1 className="text-4xl font-bold text-white mb-2">{restaurant.name}</h1>
+
+            <h1 className="text-4xl font-bold text-white mb-2">{restaurant?.restaurantInfo?.restaurantName || restaurant?.name}</h1>
+
             <div className="flex items-center space-x-4 text-white">
-              <span>{restaurant.restaurantInfo?.cuisine?.join(', ')}</span>
+              <span>{restaurant?.restaurantInfo?.cuisine?.join(', ')}</span>
               <span>•</span>
-              <span>{restaurant.restaurantInfo?.businessHours?.open} - {restaurant.restaurantInfo?.businessHours?.close}</span>
+              <span>{restaurant?.restaurantInfo?.businessHours?.open} - {restaurant?.restaurantInfo?.businessHours?.close}</span>
             </div>
           </div>
         </div>
@@ -129,23 +135,23 @@ const RestaurantMenuPage: React.FC = () => {
       
       {/* Restaurant Info and Menu */}
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-8">
+        <div className="flex flex-col md:flex-col gap-4">
           {/* Sidebar - Restaurant Info */}
-          <div className="md:w-1/3">
+          <div className="md:w-full md:mr-4">
             <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-              <h2 className="text-xl font-semibold mb-4">About</h2>
-              <p className="text-gray-700 mb-4">
+              <h2 className="text-xl font-semibold mb-1">About</h2>
+              <p className="text-gray-700 mb-1">
                 {restaurant.restaurantInfo?.description || 'No description available'}
               </p>
               
-              <h3 className="font-medium mt-4 mb-2">Address</h3>
+              <h3 className="font-medium mt-4 mb-1">Address</h3>
               <p className="text-gray-700">{restaurant.address}</p>
               
-              <h3 className="font-medium mt-4 mb-2">Contact</h3>
+              <h3 className="font-medium mt-4 mb-1">Contact</h3>
               <p className="text-gray-700">Phone: {restaurant.phoneNumber}</p>
               <p className="text-gray-700">Email: {restaurant.email}</p>
               
-              <h3 className="font-medium mt-4 mb-2">Hours</h3>
+              <h3 className="font-medium mt-4 mb-1">Hours</h3>
               <p className="text-gray-700">
                 {restaurant.restaurantInfo?.businessHours?.open} - {restaurant.restaurantInfo?.businessHours?.close}
               </p>
@@ -176,7 +182,7 @@ const RestaurantMenuPage: React.FC = () => {
           </div>
           
           {/* Main Content - Menu */}
-          <div className="md:w-2/3">
+          <div className="md:w-full md:ml-4">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold">Menu</h2>
@@ -236,18 +242,38 @@ interface MenuItemCardProps {
 }
 
 const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
-   //const { addToCart } = useCart();
-   const [isAdding, setIsAdding] = useState(false);
+  const { addItem } = useCart();
+  const [isAdding, setIsAdding] = useState(false);
+  const { id } = useParams<{ id: string }>();
+  
+  const handleAddToCart = () => {
+    if (!id) return;
+    
+    // Add item to cart
+    addItem({
+      id: item._id,
+      name: item.name,
+      price: item.price,
+      image: item.imageUrl,
+      restaurantId: id,
+      restaurantName: document.querySelector('h1')?.textContent || 'Restaurant'
+    });
+    
+    // Show feedback to user
+    setIsAdding(true);
+    setTimeout(() => setIsAdding(false), 1500);
+  };
+  
   return (
-    <div className={`border rounded-lg overflow-hidden flex ${!item.isAvailable ? 'opacity-60' : ''}`}>
+    <div className={`border rounded-lg overflow-hidden flex flex-col h-full ${!item.isAvailable ? 'opacity-60' : ''}`}>
       {/* Image Section */}
       <div>
       {item.imageUrl && (
-        <div className="w-1/3">
+        <div>
           <img 
-            src={item.imageUrl}  
-            alt={item.name} 
-           className="w-full h-full object-cover border border-red-500"
+           src={item.imageUrl}  
+           alt={item.name} 
+           className="w-full h-40 object-cover rounded-md mt-2"
            onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.src = '/default-food.jpg'; // fallback if image fails
@@ -256,15 +282,16 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
         </div>
       )}
       </div>
-      <div className={`p-4 ${item.imageUrl ? 'w-2/3' : 'w-full'}`}>
+      <div className="p-4 flex flex-col flex-grow">
         <div className="flex justify-between items-start">
           <h4 className="font-medium text-lg">{item.name}</h4>
-          <span className="font-semibold">${item.price.toFixed(2)}</span>
+          <span className="font-semibold">Rs. {item.price.toFixed(2)}</span>
         </div>
         <p className="text-gray-600 text-sm mt-1">{item.description}</p>
         
         {/* Dietary and Spicy Indicators */}
         <div className="mt-2 flex flex-wrap gap-1">
+          {/* Boolean indicators - These should only show the label */}
           {item.isVegetarian && (
             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
               Vegetarian
@@ -280,7 +307,9 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
               Gluten Free
             </span>
           )}
-          {item.spicyLevel && item.spicyLevel > 0 && (
+          
+          {/* Numeric indicators - Only show when value is greater than 0 */}
+          {item.spicyLevel !== undefined && item.spicyLevel > 0 && (
             <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
               <span className="font-semibold">Spicy Level:</span>
               {/* Display spicy level as chili peppers */}
@@ -288,12 +317,14 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
             </span>
           )}
           
-                {item.allergens && item.allergens.length > 0 && (
-                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
-                  <span className="font-semibold">Allergens:</span> {item.allergens.join(', ')}
-                </span>
-                )}
+          {/* Array indicators - Only show when array has items */}
+          {item.allergens && item.allergens.length > 0 && (
+            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+              <span className="font-semibold">Allergens:</span> {item.allergens.join(', ')}
+            </span>
+          )}
           
+          {/* Other boolean indicators */}
           {item.popularItem && (
             <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
               Popular
@@ -302,12 +333,12 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item }) => {
         </div>
         
         {/* Item Status and Add to Cart Button */}
-        <div className="mt-3 flex justify-between items-center">
+        <div className="mt-4 flex flex-col space-y-2">
             {!item.isAvailable ? (
               <span className="text-red-600 text-sm">Currently unavailable</span>
             ) : (
               <button
-                //onClick={handleAddToCart}
+                onClick={handleAddToCart}
                 disabled={!item.isAvailable || isAdding}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   isAdding 

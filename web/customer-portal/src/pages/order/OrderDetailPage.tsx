@@ -462,7 +462,7 @@ const OrderDetailPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    <span className="font-medium dark:text-white self-end sm:self-center">${(item.price * item.quantity).toFixed(2)}</span>
+                    <span className="font-medium dark:text-white self-end sm:self-center">${(item.price * (item.quantity ?? 1)).toFixed(2)}</span>
                   </div>
                 ))}
               </div>

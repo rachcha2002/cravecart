@@ -1,5 +1,6 @@
 const express = require("express");
 const userController = require("../controllers/userController");
+const deviceTokenController = require("../controllers/deviceTokenController");
 const auth = require("../middleware/auth");
 const { isAdmin, isDelivery, checkRole } = require("../middleware/roleCheck");
 const {
@@ -111,6 +112,22 @@ router.patch(
   userController.verifyDeliveryDocument
 );
 
+// Admin route to unverify delivery documents
+router.patch(
+  "/:id/delivery/documents/:documentType/unverify",
+  auth,
+  isAdmin,
+  userController.unverifyDeliveryDocument
+);
+
+// Admin route to unverify delivery partner account
+router.patch(
+  "/:id/delivery/unverify",
+  auth,
+  isAdmin,
+  userController.unverifyDeliveryPartner
+);
+
 // User routes
 router.get("/me", auth, userController.getCurrentUser);
 router.patch("/me/deactivate", auth, userController.deactivateOwnAccount);
@@ -120,5 +137,22 @@ router.get("/role/:role", userController.getUsersByRole);
 
 // Get user contact info by ID (no auth required)
 router.get("/contact/:id", userController.getUserContactInfo);
+
+// Device token routes
+router.post(
+  "/users/:userId/device-tokens",
+  auth,
+  deviceTokenController.registerDeviceToken
+);
+router.delete(
+  "/users/:userId/device-tokens/:token",
+  auth,
+  deviceTokenController.removeDeviceToken
+);
+router.get(
+  "/users/:userId/device-tokens",
+  auth,
+  deviceTokenController.getUserDeviceTokens
+);
 
 module.exports = router;

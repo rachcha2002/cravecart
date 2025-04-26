@@ -8,11 +8,22 @@ import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { Outlet } from "react-router-dom";
 
+function MenuRouteWrapper() {
+  const { user } = useAuth();
+
+  if (!user) {
+    return <div>Loading...</div>;
+  }
+
+  return <Menu restaurantId={user._id} />;
+}
+
 const router = createBrowserRouter([
+  
   {
     path: "/",
     element: <LandingPage />,
@@ -41,7 +52,7 @@ const router = createBrowserRouter([
       },
       {
         path: "menu",
-        element: <Menu />,
+        element: <MenuRouteWrapper />,
       },
       {
         path: "orders",
