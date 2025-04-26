@@ -20,7 +20,7 @@ app.use(compression());
 // Configure Socket.IO with optimized settings
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+    origin: process.env.CORS_ORIGIN || '*' ,
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -194,9 +194,9 @@ io.on('connection', (socket) => {
 
 // Enhanced middleware setup with security and performance headers
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  credentials: true
+  credentials: false // Change to false for simple cross-origin requests without credentials
 }));
 
 app.use(helmet({
