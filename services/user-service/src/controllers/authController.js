@@ -51,6 +51,35 @@ const register = async (req, res) => {
       user: user.toJSON(),
       token,
     });
+
+    // Send notification about new user registration
+    try {
+      await fetch(
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [user._id.toString()],
+            title: "Welcome to CraveCart",
+            message: `Your account has been successfully created. ${
+              ["admin", "restaurant", "delivery"].includes(user.role)
+                ? "Your account is pending verification by an administrator."
+                : "You can now start using our services."
+            }`,
+            channels: ["Email"],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send registration notification:",
+        notificationError
+      );
+      // Continue with the response despite notification failure
+    }
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -144,6 +173,37 @@ const changePassword = async (req, res) => {
     await req.user.save();
 
     res.json({ message: "Password changed successfully" });
+
+    // Send notification about password change
+    try {
+      await fetch(
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [req.user._id.toString()],
+            title: "Password Changed",
+            message:
+              "Your password has been successfully changed. If you didn't make this change, please contact support immediately.",
+            channels: [
+              "Email",
+              ...(["admin", "restaurant", "delivery"].includes(req.user.role)
+                ? ["SMS"]
+                : []),
+            ],
+          }),
+        }
+      );
+    } catch (notificationError) {
+      console.error(
+        "Failed to send password change notification:",
+        notificationError
+      );
+      // Continue despite notification failure
+    }
   } catch (error) {
     console.error("Change password error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
