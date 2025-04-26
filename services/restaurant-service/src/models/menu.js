@@ -93,7 +93,7 @@ const menuCategorySchema = new mongoose.Schema({
     trim: true
   },
   description: String,
-  imageUrl: String,
+  image: String,
   items: [menuItemSchema],
   availabilityTimes: {
     allDay: {
