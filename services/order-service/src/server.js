@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const compression = require('compression');
+const axios = require('axios');
 const DeliveryRoutes = require('./routes/Delivery-routes'); 
 
 // Load environment variables
@@ -14,6 +15,43 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
+
+// Helper function to send in-app notifications
+const sendInAppNotification = async (userId, title, message, role = 'CUSTOMER') => {
+  try {
+    console.log(`[NOTIFICATION] Preparing to send notification to user ${userId} with role ${role}`);
+    console.log(`[NOTIFICATION] Title: "${title}"`);
+    console.log(`[NOTIFICATION] Message: "${message}"`);
+    
+    const notificationUrl = `${process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:5005'}/api/notifications/senddirect`;
+    console.log(`[NOTIFICATION] Sending request to: ${notificationUrl}`);
+    
+    const payload = {
+      title,
+      message,
+      userIds: [userId],
+      channels: ['IN_APP']
+    };
+    console.log(`[NOTIFICATION] Request payload: ${JSON.stringify(payload)}`);
+    
+    const response = await axios.post(notificationUrl, payload);
+    console.log(`[NOTIFICATION] Response status: ${response.status}`);
+    console.log(`[NOTIFICATION] Response data: ${JSON.stringify(response.data)}`);
+    
+    console.log(`[NOTIFICATION] Successfully sent notification to user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error(`[NOTIFICATION] ERROR: Failed to send in-app notification to user ${userId}:`, error.message);
+    if (error.response) {
+      console.error(`[NOTIFICATION] ERROR: Response status: ${error.response.status}`);
+      console.error(`[NOTIFICATION] ERROR: Response data:`, error.response.data);
+    }
+    return false;
+  }
+};
+
+// Make sendInAppNotification accessible across the application
+app.set('sendInAppNotification', sendInAppNotification);
 
 // Enable compression for all responses
 app.use(compression());
@@ -156,7 +194,7 @@ io.on('connection', (socket) => {
 
 // Enhanced middleware setup with security and performance headers
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: false // Change to false for simple cross-origin requests without credentials
 }));

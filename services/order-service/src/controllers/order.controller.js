@@ -84,6 +84,9 @@ exports.createOrder = async (req, res) => {
     if (savedOrder.paymentStatus === 'completed') {
       const restaurantId = savedOrder.restaurant._id;
       
+      console.log(`[NOTIFICATION] New order ${savedOrder.orderId} with completed payment`);
+      console.log(`[NOTIFICATION] Sending socket notification to restaurant: ${restaurantId}`);
+      
       // Emit to specific restaurant room
       io.to(`restaurant-${restaurantId}`).emit('new-order', {
         orderId: savedOrder.orderId,
@@ -223,6 +226,10 @@ const sendOrderUpdate = (req, orderId, data) => {
 // Helper function to create and send notifications
 const sendNotifications = (req, order, status, description) => {
   try {
+    console.log(`[NOTIFICATION] Processing status update notification for order ${order.orderId}`);
+    console.log(`[NOTIFICATION] Status: ${status}`);
+    console.log(`[NOTIFICATION] Description: ${description || 'N/A'}`);
+    
     const io = req.app.get('io');
     const customerIo = req.app.get('customerIo');
     const orderId = order.orderId;
@@ -237,18 +244,38 @@ const sendNotifications = (req, order, status, description) => {
       timestamp: new Date().toISOString()
     });
     
-    // 1. Emit status update event to restaurant
+    // Get the sendInAppNotification function
+    const sendInAppNotification = req.app.get('sendInAppNotification');
+    
+    // 1. Emit status update event to restaurant & send in-app notification
     const restaurantId = order.restaurant?._id;
     if (restaurantId) {
+      console.log(`[NOTIFICATION] Sending socket notification to restaurant: ${restaurantId}`);
       io.to(`restaurant-${restaurantId}`).emit(
         'order-status-update', 
         createNotificationPayload(`Order ${orderId} status updated to `)
       );
+      
+      // Send in-app notification to restaurant
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to restaurant: ${restaurantId}`);
+        const title = 'Order Status Update';
+        const message = `Order #${orderId} status has been updated to ${formatStatus(status)}`;
+        
+        sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
+          });
+      }
     }
     
-    // 2. Emit to customer if user data exists
+    // 2. Emit to customer if user data exists & send in-app notification
     const customerId = order.user?._id || order.user?.id;
     if (customerId) {
+      console.log(`[NOTIFICATION] Sending socket notification to customer: ${customerId}`);
       const customerPayload = createNotificationPayload('Your order status has been updated to ');
       
       // Main namespace - customer-specific room
@@ -258,9 +285,25 @@ const sendNotifications = (req, order, status, description) => {
       if (customerIo) {
         customerIo.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
       }
+      
+      // Send in-app notification to customer
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to customer: ${customerId}`);
+        const title = 'Order Status Update';
+        const message = `Your order #${orderId} status has been updated to ${formatStatus(status)}`;
+        
+        sendInAppNotification(customerId, title, message, 'CUSTOMER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to customer ${result ? 'succeeded' : 'failed'}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending customer notification:`, err.message);
+          });
+      }
     }
-  
+   
     // 3. Broadcast to order-specific room
+    console.log(`[NOTIFICATION] Broadcasting to order room: order-${orderId}`);
     io.to(`order-${orderId}`).emit('order-status-update', createNotificationPayload());
     
     // 4. Emit to customer namespace order-specific room
@@ -270,7 +313,7 @@ const sendNotifications = (req, order, status, description) => {
     
     return true;
   } catch (error) {
-    console.error('Error sending notifications:', error);
+    console.error('[NOTIFICATION] ERROR: Error sending notifications:', error.message);
     return false;
   }
 };
