@@ -11,8 +11,7 @@ const Layout = () => {
     { name: "Users", path: "/users", icon: "👥" },
     { name: "Restaurants", path: "/restaurants", icon: "🍽️" },
     { name: "Orders", path: "/orders", icon: "📦" },
-    { name: "Reports", path: "/reports", icon: "📈" },
-    { name: "Settings", path: "/settings", icon: "⚙️" },
+   
   ];
 
   const toggleSidebar = () => {

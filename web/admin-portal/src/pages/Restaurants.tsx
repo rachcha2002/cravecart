@@ -1,8 +1,10 @@
+// RestaurantPage.tsx
+
 import React, { useState, useEffect } from 'react';
 import { restaurantService } from '../services/restaurantService';
-import { Restaurant, RestaurantsResponse, ErrorResponse } from '../types/restaurant';
+import { Restaurant, RestaurantsResponse, ErrorResponse } from '../types/restaurant.types';
 
-const RestaurantPage: React.FC = () => {
+const Restaurants: React.FC = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ const RestaurantPage: React.FC = () => {
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-4">
       <h1 className="text-3xl font-bold mb-6">Restaurants</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {restaurants.map((restaurant) => (
@@ -108,17 +110,9 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
             {restaurant.restaurantInfo?.businessHours?.open} - {restaurant.restaurantInfo?.businessHours?.close}
           </div>
         </div>
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <a 
-            href={`/restaurants/${restaurant._id}`} 
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-          >
-            View Details →
-          </a>
-        </div>
       </div>
     </div>
   );
 };
 
-export default RestaurantPage;
+export default Restaurants;

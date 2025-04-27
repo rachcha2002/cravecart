@@ -1,9 +1,8 @@
 // restaurantService.ts
-import { RestaurantsResponse, RestaurantResponse } from '../types/restaurant';
-import {  MenuResponse } from '../types/menu';
+import { RestaurantsResponse, RestaurantResponse } from '../types/restaurant.types';
 
-const API_BASE_URL = `${process.env.REACT_APP_API_URL}/api` || 'http://localhost:3001/api';
-const API_MENU_URL = `${process.env.REACT_APP_MENU_URL}/api/menus` || 'http://localhost:5004/api/menus';
+
+const API_BASE_URL = `${process.env.REACT_APP_API_BASE_URL}/api` || 'http://localhost:3001/api';
 
 export const restaurantService = {
   /**
@@ -46,25 +45,4 @@ export const restaurantService = {
       throw error;
     }
   },
-
-  /**
- * Get menu by restaurant ID
- * @param restaurantId Restaurant ID
- * @returns Promise with menu data
- */
-  getMenuByRestaurantId: async (restaurantId: string): Promise<MenuResponse> => {
-   try {
-    const response = await fetch(`${API_MENU_URL}/getmenus/${restaurantId}`);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch restaurant menu');
-    }
-    console.log('Menu data:', data); // Log the menu data for debugging
-    return data;
-  } catch (error) {
-    console.error(`Error fetching menu for restaurant ${restaurantId}:`, error);
-    throw error;
-  }
-}
 };

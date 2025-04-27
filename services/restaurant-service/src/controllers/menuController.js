@@ -2,7 +2,7 @@ const Menu = require('../models/Menu');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
-const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001/api';
+const USER_SERVICE_URL = `${process.env.USER_SERVICE_URL/api}` || 'http://localhost:3001/api';
 
 /**
  * Validates if a user has access to a restaurant

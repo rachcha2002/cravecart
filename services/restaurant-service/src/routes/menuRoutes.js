@@ -1,10 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const menuController = require('../controllers/menuController');
-const { authenticate, authorizeRestaurant } = require('../middleware/auth');
-
-// Middleware to authenticate and authorize restaurant users
-// These would communicate with the user-service to verify tokens and roles
 
 // Menu routes
 router.post('/create/:restaurantId', menuController.createMenu);

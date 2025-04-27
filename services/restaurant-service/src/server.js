@@ -44,4 +44,4 @@ const connectDB = async () => {
 
 connectDB();
 
-module.exports = app; // For testing
+module.exports = app;

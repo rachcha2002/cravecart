@@ -50,7 +50,6 @@ exports.authorizeRestaurant = async (req, res, next) => {
     const { restaurantId } = req.params;
     
     // Make API call to user-service to validate ownership
-    // This is how microservices communicate with each other
     try {
       const response = await axios.get(`${userServiceBaseUrl}/restaurants/validate-restaurant-access`, {
         params: {
