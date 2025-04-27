@@ -10,6 +10,10 @@ export interface OrderItemProps {
   status: 'order-received' | 'preparing-your-order' | 'wrapping-up' | 'picking-up' | 'heading-your-way' | 'delivered' | 'cancelled';
   items: string[];
   estimatedDeliveryTime?: string;
+  deliveryLocation?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 const OrderItem: React.FC<OrderItemProps> = ({
@@ -20,6 +24,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
   status,
   items,
   estimatedDeliveryTime,
+  deliveryLocation,
 }) => {
   const getStatusColor = () => {
     switch (status) {
@@ -150,6 +155,18 @@ const OrderItem: React.FC<OrderItemProps> = ({
           </p>
           <Link 
             to={`/orders/${id}`} 
+            state={{ 
+              order: {
+                id,
+                restaurantName,
+                date,
+                total,
+                status,
+                items,
+                estimatedDeliveryTime,
+                deliveryLocation
+              }
+            }}
             className="inline-flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
           >
             View Details
@@ -161,4 +178,4 @@ const OrderItem: React.FC<OrderItemProps> = ({
   );
 };
 
-export default OrderItem; 
+export default OrderItem;

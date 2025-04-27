@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeftIcon, 
@@ -10,12 +10,22 @@ import {
   ChatBubbleLeftIcon, 
   CreditCardIcon,
   ArrowPathIcon,
-  SignalIcon
+  SignalIcon,
+  MapIcon
 } from '@heroicons/react/24/outline';
 import orderService from '../../services/orderService';
 import { toast } from 'react-hot-toast';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import io from 'socket.io-client';
+import './../../components/map/leaflet.css';
+
+// Lazy load the DeliveryMap component to prevent issues with SSR
+const DeliveryMap = lazy(() => import('../../components/map/DeliveryMap'));
+const MapFallback = lazy(() => import('../../components/map/MapFallback'));
+
+// Add the API_URL constant to use the correct socket endpoint
+const API_URL ='http://localhost:3005';
 
 interface OrderItem {
   name: string;
@@ -46,6 +56,10 @@ interface OrderDetails {
   paymentMethod: string;
   deliveryAddress: string;
   deliveryInstructions: string;
+  deliveryLocation?: {
+    latitude: number;
+    longitude: number;
+  };
   driver?: {
     name: string;
     phone: string;
@@ -54,20 +68,28 @@ interface OrderDetails {
   };
   deliveryTimeline: DeliveryTimelineItem[];
   createdAt: string;
+  _id?: string; // Add _id field that may be present in API response
 }
 
 const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, token } = useAuth();
-  const { addNotification, socket, socketConnected, reconnectSocket } = useNotifications();
-  const [activeTab, setActiveTab] = useState<'details' | 'timeline'>('details');
+  const { addNotification, socket: globalSocket, reconnectSocket } = useNotifications();
+  const [activeTab, setActiveTab] = useState<'details' | 'timeline' | 'track'>('details');
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
   const sseRef = useRef<EventSource | null>(null);
+
+  const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [deliveryLocation, setDeliveryLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const socketRef = useRef<any>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
+
   
   // Function to fetch order details
   const fetchOrderDetails = useCallback(async (orderId: string) => {
@@ -84,6 +106,14 @@ const OrderDetailPage: React.FC = () => {
       if (response.success && response.data) {
         const orderData = response.data;
         
+        // Get delivery location from the order data
+        if (orderData.deliveryLocation) {
+          setDeliveryLocation({
+            latitude: orderData.deliveryLocation.latitude,
+            longitude: orderData.deliveryLocation.longitude
+          });
+        }
+
         const formattedOrder: OrderDetails = {
           id: orderData._id,
           orderId: orderData.orderId,
@@ -105,6 +135,7 @@ const OrderDetailPage: React.FC = () => {
           paymentMethod: `${orderData.paymentMethod || 'Card'} (${orderData.paymentId})`,
           deliveryAddress: orderData.deliveryAddress || 'Address not available',
           deliveryInstructions: orderData.deliveryInstructions || 'No specific instructions',
+          deliveryLocation: orderData.deliveryLocation,
           driver: orderData.driver ? {
             name: orderData.driver.name || 'Not assigned yet',
             phone: orderData.driver.phoneNumber || 'Not available',
@@ -145,7 +176,7 @@ const OrderDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, navigate]);
+  }, []);
 
   // Manually refresh order details
   const refreshOrder = useCallback(() => {
@@ -154,24 +185,81 @@ const OrderDetailPage: React.FC = () => {
     }
   }, [id, fetchOrderDetails]);
 
-  // Effect for cleanup of SSE
+
   useEffect(() => {
-    if (!id) return;
-    
-    // Clean up any existing SSE connection
-    if (sseRef.current) {
-      sseRef.current.close();
-      sseRef.current = null;
+    if (!id || !orderDetails || 
+        (orderDetails.status !== 'picking-up' && orderDetails.status !== 'heading-your-way')) {
+      return;
+    }
+
+    // Only connect socket when track tab is active
+    if (activeTab !== 'track') {
+      return;
     }
     
+
     // No need to set up SSE anymore - don't try to set socketConnected from here
+
+    // Extract MongoDB ID from the formatted ID if needed
+    const rawOrderId = orderDetails._id || orderDetails.id;
     
-    // Clean up on unmount
-    return () => {
-      if (sseRef.current) {
-        sseRef.current.close();
-        sseRef.current = null;
+    // Connect to socket server - use environment variable or fall back to localhost
+    console.log('🔌 Connecting to socket server for tracking order:', rawOrderId);
+    console.log('🔑 Using raw order ID for socket room:', rawOrderId);
+    
+    const trackingSocket = io(API_URL, {
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000, // Increased timeout to 20 seconds
+      transports: ['websocket', 'polling'] // Explicitly set transports
+    });
+    
+    socketRef.current = trackingSocket;
+    
+    trackingSocket.on('connect', () => {
+      console.log('✅ Tracking socket connected with ID:', trackingSocket.id);
+      setSocketConnected(true);
+      
+      // Join room for this specific order
+      trackingSocket.emit('customerTrackOrder', {
+        orderId: rawOrderId
+      });
+      
+      console.log('👥 Joined customer tracking room for order:', rawOrderId);
+      
+      // Request initial rider location if available
+      trackingSocket.emit('requestInitialRiderLocation', {
+        orderId: rawOrderId
+      });
+    });
+
+    
+    // Listen for rider location updates
+    trackingSocket.on('riderLocationUpdate', (data) => {
+      console.log('📍 Received rider location update:', data);
+      
+      // Verify this update is for our order
+      if (data.orderId === rawOrderId || 
+          data.orderId === orderDetails.orderId || 
+          data.orderId === id) {
+        
+        console.log(`🚚 Rider for order ${orderDetails.orderId} is at: ${data.latitude}, ${data.longitude}`);
+        
+        // Update rider location state with the received coordinates
+        if (data.latitude && data.longitude) {
+          setRiderLocation({
+            latitude: data.latitude,
+            longitude: data.longitude
+          });
+          setLastUpdated(new Date());
+          console.log('🔄 Updated rider location on map at', new Date().toLocaleTimeString());
+        } else {
+          console.warn('⚠️ Received rider location update without valid coordinates');
+        }
       }
+
     };
   }, [id]);
   
@@ -188,13 +276,38 @@ const OrderDetailPage: React.FC = () => {
     }
     
     // Clean up interval on unmount or when socket reconnects
+
+    });
+    
+    trackingSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      setSocketConnected(false);
+      toast.error('Unable to connect to tracking service. Retrying...');
+    });
+    
+    trackingSocket.on('error', (error) => {
+      console.error('❌ Tracking socket error:', error);
+      setSocketConnected(false);
+    });
+    
+    trackingSocket.on('disconnect', () => {
+      console.log('🔌 Tracking socket disconnected');
+      setSocketConnected(false);
+    });
+    
+    // Cleanup on unmount or tab change
+
     return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+      if (trackingSocket) {
+        console.log('🧹 Disconnecting tracking socket');
+        trackingSocket.disconnect();
+        socketRef.current = null;
+        setSocketConnected(false);
       }
     };
-  }, [socketConnected, id, fetchOrderDetails]);
-  
+
+  }, [id, orderDetails, activeTab]);
+
   // Initial order fetch
   useEffect(() => {
     if (id) {
@@ -212,7 +325,7 @@ const OrderDetailPage: React.FC = () => {
       fetchOrderDetails(id);
     }
   }, [id, fetchOrderDetails]);
-  
+
   const formatStatus = (status: string): string => {
     return status
       .split('-')
@@ -265,21 +378,38 @@ const OrderDetailPage: React.FC = () => {
     return colors[index];
   };
 
-  // Connection status indicator without SSE support
+
+  // Add a function to manually reconnect the socket
+  const reconnectTrackingSocket = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    setSocketConnected(false);
+    
+    // Switch to track tab which will trigger the useEffect to reconnect
+    setActiveTab('track');
+    toast('Reconnecting to tracking service...');
+  }, []);
+
+  // Connection status indicator
+
   const ConnectionStatusIndicator = () => (
     <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-4">
       <div className="flex items-center">
         <div className="relative w-3 h-3 rounded-full mr-2 bg-gray-300">
-          <div className={`absolute inset-0 rounded-full ${socketConnected ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+
+          <div className={`absolute inset-0 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
           {socketConnected && (
-            <span className="animate-ping absolute inset-0 rounded-full bg-blue-400 opacity-75"></span>
+            <span className="animate-ping absolute inset-0 rounded-full bg-green-400 opacity-75"></span>
+
           )}
         </div>
         <div>
           <p className="text-sm font-medium dark:text-white">
-            {socketConnected 
-              ? 'Socket Updates Active' 
-              : 'Updates Offline'}
+
+            {socketConnected ? 'Live Tracking Active' : 'Tracking Offline'}
+
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Last updated: {lastUpdated.toLocaleTimeString()}
@@ -289,19 +419,16 @@ const OrderDetailPage: React.FC = () => {
       <div className="flex items-center space-x-2">
         {!socketConnected && (
           <button 
-            onClick={() => {
-              // Try to reconnect socket
-              reconnectSocket();
-              // Also refresh the order details
-              refreshOrder();
-            }}
+
+            onClick={reconnectTrackingSocket}
+
             className="flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
           >
             <SignalIcon className="w-3 h-3 mr-1" />
             Reconnect
           </button>
         )}
-        <button 
+        <button
           onClick={refreshOrder}
           className="flex items-center px-3 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
         >
@@ -327,15 +454,15 @@ const OrderDetailPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg text-center">
-          <p className="text-red-600 dark:text-red-400 mb-4">{error || 'Failed to load order details'}</p>
+          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
           <div className="flex justify-center space-x-4">
-            <button 
+            <button
               onClick={() => fetchOrderDetails(id || '')}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Try Again
             </button>
-            <button 
+            <button
               onClick={() => navigate('/orders')}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
             >
@@ -350,6 +477,11 @@ const OrderDetailPage: React.FC = () => {
   if (!orderDetails) {
     return null;
   }
+  
+  // Add this additional tab option
+  const tabs = orderDetails?.status === 'picking-up' || orderDetails?.status === 'heading-your-way'
+    ? ['details', 'timeline', 'track']
+    : ['details', 'timeline'];
 
   return (
     <motion.div
@@ -366,10 +498,7 @@ const OrderDetailPage: React.FC = () => {
           </Link>
         </div>
 
-        {/* Connection Status Indicator */}
-        <ConnectionStatusIndicator />
-
-        {/* Order Header */}
+        {/* Add Track Order Button for active deliveries */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-start">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold mr-4 ${getRestaurantColor()}`}>
@@ -381,8 +510,21 @@ const OrderDetailPage: React.FC = () => {
                   <h2 className="text-2xl font-bold dark:text-white">{orderDetails.restaurantName}</h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{orderDetails.date}</p>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(formatStatus(orderDetails.status))}`}>
-                  {formatStatus(orderDetails.status)}
+                <div className="flex flex-col items-end space-y-2">
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(formatStatus(orderDetails.status))}`}>
+                    {formatStatus(orderDetails.status)}
+                  </div>
+                  
+                  {/* Track Order button - only visible for active deliveries */}
+                  {(orderDetails.status === 'picking-up' || orderDetails.status === 'heading-your-way') && (
+                    <button 
+                      onClick={() => setActiveTab('track')} 
+                      className="flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <MapIcon className="h-4 w-4 mr-1" />
+                      Track Order
+                    </button>
+                  )}
                 </div>
               </div>
               <p className="text-gray-600 dark:text-gray-400 mt-2">Order #{orderDetails.orderId}</p>
@@ -390,6 +532,7 @@ const OrderDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Tab Navigation */}
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
           <button
             onClick={() => setActiveTab('details')}
@@ -411,9 +554,25 @@ const OrderDetailPage: React.FC = () => {
           >
             Delivery Timeline
           </button>
+          
+          {/* Only show tracking tab for applicable order statuses */}
+          {(orderDetails.status === 'picking-up' || orderDetails.status === 'heading-your-way') && (
+            <button
+              onClick={() => setActiveTab('track')}
+              className={`py-3 px-6 font-medium ${
+                activeTab === 'track'
+                  ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-500'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              Live Tracking
+            </button>
+          )}
         </div>
 
+        {/* Display appropriate content based on active tab */}
         {activeTab === 'details' ? (
+          // Details tab content
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold mb-4 dark:text-white">Order Items</h3>
@@ -433,7 +592,9 @@ const OrderDetailPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    <span className="font-medium dark:text-white self-end sm:self-center">Rs. {(item.price * (item.quantity ?? 1)).toFixed(2)}</span>
+
+                    <span className="font-medium dark:text-white self-end sm:self-center">${(item.price * item.quantity).toFixed(2)}</span>
+
                   </div>
                 ))}
               </div>
@@ -487,7 +648,7 @@ const OrderDetailPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-6">
               <h3 className="text-lg font-semibold mb-4 dark:text-white">Restaurant Information</h3>
               <div className="space-y-4">
                 <div className="flex">
@@ -506,35 +667,9 @@ const OrderDetailPage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {orderDetails.driver && (
-              <div className="p-6">
-                <h3 className="text-lg font-semibold mb-4 dark:text-white">Driver Information</h3>
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <div className="h-10 w-10 rounded-full bg-blue-200 flex items-center justify-center mr-3">
-                      <TruckIcon className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium dark:text-blue-300">{orderDetails.driver.name}</p>
-                      <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
-                        <span className="mr-2">Rating: {orderDetails.driver.rating}</span>
-                        <span>{orderDetails.driver.vehicleInfo}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <a
-                    href={`tel:${orderDetails.driver.phone}`}
-                    className="flex items-center justify-center mt-2 py-2 w-full bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-                  >
-                    <PhoneIcon className="h-4 w-4 mr-2" />
-                    Call Driver
-                  </a>
-                </div>
-              </div>
-            )}
           </div>
-        ) : (
+        ) : activeTab === 'timeline' ? (
+          // Timeline tab content
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="relative">
               {orderDetails.deliveryTimeline && orderDetails.deliveryTimeline.length > 0 ? (
@@ -574,10 +709,78 @@ const OrderDetailPage: React.FC = () => {
               )}
             </div>
           </div>
+        ) : (
+          // Track tab content
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-4 dark:text-white">Live Order Tracking</h3>
+            
+            <ConnectionStatusIndicator />
+            
+            {orderDetails.deliveryLocation ? (
+              <div className="space-y-4">
+                <div className="h-64 rounded-lg overflow-hidden">
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-700 rounded-lg">
+                      <div className="w-10 h-10 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin"></div>
+                    </div>
+                  }>
+                    <DeliveryMap
+                      riderLocation={riderLocation}
+                      deliveryLocation={orderDetails.deliveryLocation}
+                      height="300px"
+                    />
+                  </Suspense>
+                </div>
+                
+                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <TruckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <span className="font-medium dark:text-blue-300">
+                      {orderDetails.status === 'picking-up' 
+                        ? 'Driver is heading to restaurant' 
+                        : 'Driver is heading your way'}
+                    </span>
+                  </div>
+                  <span className="text-sm text-blue-600 dark:text-blue-400">
+                    Updated: {lastUpdated.toLocaleTimeString()}
+                  </span>
+                </div>
+                
+                {orderDetails.driver && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <h4 className="font-medium mb-2 dark:text-white">Driver Information</h4>
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-full bg-blue-200 flex items-center justify-center mr-3">
+                        <TruckIcon className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium dark:text-gray-200">{orderDetails.driver.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{orderDetails.driver.vehicleInfo}</p>
+                      </div>
+                      <a
+                        href={`tel:${orderDetails.driver.phone}`}
+                        className="flex items-center px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                      >
+                        <PhoneIcon className="h-4 w-4 mr-1" />
+                        Call
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Suspense fallback={<div className="h-48"></div>}>
+                <MapFallback 
+                  height="300px"
+                  message="Delivery location not available. Cannot display map."
+                />
+              </Suspense>
+            )}
+          </div>
         )}
       </div>
     </motion.div>
   );
 };
 
-export default OrderDetailPage; 
+export default OrderDetailPage;
