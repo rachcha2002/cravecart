@@ -31,10 +31,7 @@ const OrderSummary: React.FC = () => {
   const { locations, defaultLocation, isLoading: locationsLoading } = useLocations();
   const { 
     items, 
-    total: foodSubtotal, 
-    tax,
-    deliveryFee,
-    orderTotal,
+    total: foodSubtotal,
     restaurantId,
     isEmpty,
     clearCart
@@ -66,12 +63,8 @@ const OrderSummary: React.FC = () => {
   const [restaurantLocation, setRestaurantLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [fullRestaurantData, setFullRestaurantData] = useState<any>(null);
   
-  // Default price calculation parameters - use passed parameters if available
-  const calculationParams = passedState?.calculationParams || {};
-  const baseDeliveryFee = calculationParams.baseDeliveryFee || 2.99;
-  const deliveryPerKmRate = calculationParams.deliveryPerKmRate || 0.5;
-  const restaurantCommissionRate = calculationParams.restaurantCommissionRate || 15;
-  const serviceFeeRate = calculationParams.serviceFeeRate || 5;
+  // Default commission rate
+  const restaurantCommissionRate = 15;
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
   // Log received data for debugging
@@ -120,15 +113,12 @@ const OrderSummary: React.FC = () => {
       const prices = calculateOrderPrices({
         foodSubtotal,
         deliveryDistanceKM,
-        baseDeliveryFee,
-        deliveryPerKmRate,
-        restaurantCommissionRate,
-        serviceFeeRate
+        restaurantCommissionRate
       });
       
       setPriceBreakdown(prices);
     }
-  }, [foodSubtotal, deliveryDistanceKM, baseDeliveryFee, deliveryPerKmRate, restaurantCommissionRate, serviceFeeRate]);
+  }, [foodSubtotal, deliveryDistanceKM, restaurantCommissionRate]);
 
   useEffect(() => {
     // If cart is empty, redirect to restaurants page
@@ -336,6 +326,30 @@ const OrderSummary: React.FC = () => {
     setIsProcessingOrder(true);
 
     try {
+      // Create a modified version of fullRestaurantData with coordinates limited to 7 decimal points
+      let restaurantWithLimitedCoords = null;
+      if (fullRestaurantData) {
+        restaurantWithLimitedCoords = {
+          ...fullRestaurantData
+        };
+        
+        // Check if restaurant has location with coordinates
+        if (restaurantWithLimitedCoords.restaurantInfo?.location?.coordinates?.length === 2) {
+          // Deep clone and modify the coordinates to 7 decimal places
+          restaurantWithLimitedCoords.restaurantInfo = {
+            ...restaurantWithLimitedCoords.restaurantInfo,
+            location: {
+              ...restaurantWithLimitedCoords.restaurantInfo.location,
+              type: "Point", // Ensure type is "Point" as shown in the image
+              coordinates: [
+                Number(restaurantWithLimitedCoords.restaurantInfo.location.coordinates[0].toFixed(7)),
+                Number(restaurantWithLimitedCoords.restaurantInfo.location.coordinates[1].toFixed(7))
+              ]
+            }
+          };
+        }
+      }
+      
       // Create order data according to the Order model structure
       const orderData = {
         orderId: generatedOrderNumber,
@@ -358,7 +372,7 @@ const OrderSummary: React.FC = () => {
           name: 'Guest',
           email: 'guest@example.com'
         },
-        restaurant: fullRestaurantData || {
+        restaurant: restaurantWithLimitedCoords || {
           _id: restaurantId,
           restaurantName: restaurantName,
           name: restaurantName
@@ -379,22 +393,22 @@ const OrderSummary: React.FC = () => {
           totalDeliveryFee: priceBreakdown?.totalDeliveryFee || 0,
           serviceFee: priceBreakdown?.serviceFee || 0,
           tax: priceBreakdown?.tax || 0,
-          total: priceBreakdown?.total || orderTotal,
+          total: priceBreakdown?.total || foodSubtotal,
           driverEarnings: priceBreakdown?.driverEarnings || 0,
           companyFee: 0
         },
         // Legacy fields for backward compatibility
           subtotal: foodSubtotal,
-        deliveryFee: priceBreakdown?.totalDeliveryFee || deliveryFee,
-        tax: priceBreakdown?.tax || tax,
-        total: priceBreakdown?.total || orderTotal,
+        deliveryFee: priceBreakdown?.totalDeliveryFee || 0,
+        tax: priceBreakdown?.tax || 0,
+        total: priceBreakdown?.total || foodSubtotal,
         deliveryDistanceKM: deliveryDistanceKM,
         paymentId: 'pending-payment',
         paymentMethod: 'card',
         deliveryAddress: deliveryAddress,
         deliveryLocation: {
-          latitude: locationCoordinates?.latitude || 0,
-          longitude: locationCoordinates?.longitude || 0
+          latitude: locationCoordinates ? Number(locationCoordinates.latitude.toFixed(7)) : 0,
+          longitude: locationCoordinates ? Number(locationCoordinates.longitude.toFixed(7)) : 0
         }
       };
 
@@ -417,10 +431,10 @@ const OrderSummary: React.FC = () => {
               priceBreakdown: priceBreakdown,
               // Add calculation parameters
               calculationParams: {
-                baseDeliveryFee,
-                deliveryPerKmRate,
+                baseDeliveryFee: priceBreakdown?.baseDeliveryFee || 0,
+                deliveryPerKmRate: priceBreakdown?.deliveryPerKmRate || 0,
                 restaurantCommissionRate,
-                serviceFeeRate,
+                serviceFeeRate: 0.02,
                 freeDeliveryThreshold: 3.0
               },
               restaurantName,
@@ -459,10 +473,10 @@ const OrderSummary: React.FC = () => {
                 deliveryDistance: deliveryDistanceKM,
                 priceBreakdown: priceBreakdown,
                 calculationParams: {
-                  baseDeliveryFee,
-                  deliveryPerKmRate,
+                  baseDeliveryFee: priceBreakdown?.baseDeliveryFee || 0,
+                  deliveryPerKmRate: priceBreakdown?.deliveryPerKmRate || 0,
                   restaurantCommissionRate,
-                  serviceFeeRate,
+                  serviceFeeRate: 0.02,
                   freeDeliveryThreshold: 3.0
                 },
                 restaurantName,
@@ -707,9 +721,9 @@ const OrderSummary: React.FC = () => {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">${(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
+                      <p className="font-medium">Rs. {(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
                       <p className="text-gray-500 dark:text-gray-400 text-sm">
-                        ${item.price.toFixed(2)} each
+                        Rs. {item.price.toFixed(2)} each
                       </p>
                     </div>
                   </div>
@@ -728,24 +742,24 @@ const OrderSummary: React.FC = () => {
           <div className="space-y-3 mb-6">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Food Subtotal</span>
-              <span>${formatCurrency(foodSubtotal)}</span>
+              <span>{formatCurrency(foodSubtotal)}</span>
             </div>
             
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
-              <span>${formatCurrency(priceBreakdown?.totalDeliveryFee || deliveryFee)}</span>
+              <span>{formatCurrency(priceBreakdown?.totalDeliveryFee || 0)}</span>
             </div>
             
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Service & Tax</span>
-              <span>${formatCurrency((priceBreakdown?.serviceFee || 0) + (priceBreakdown?.tax || tax))}</span>
+              <span>{formatCurrency((priceBreakdown?.serviceFee || 0) + (priceBreakdown?.tax || 0))}</span>
             </div>
             
             <div className="pt-3 mt-2 border-t border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-lg">Total</span>
                 <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
-                  ${formatCurrency(priceBreakdown ? priceBreakdown.total : orderTotal)}
+                  {formatCurrency(priceBreakdown ? priceBreakdown.total : foodSubtotal)}
                 </span>
               </div>
               

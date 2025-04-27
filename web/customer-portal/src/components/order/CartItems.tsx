@@ -44,11 +44,11 @@ const CartItems: React.FC<CartItemsProps> = ({ compact = false }) => {
             <div>
               <div className="flex justify-between text-base font-medium text-gray-900 dark:text-white">
                 <h3 className={compact ? 'text-sm' : 'text-base'}>{item.name}</h3>
-                <p className="ml-4">${(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
+                <p className="ml-4">Rs. {(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
               </div>
               {!compact && (
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  ${item.price.toFixed(2)} each
+                  Rs. {item.price.toFixed(2)} each
                 </p>
               )}
               <div className="mt-1 flex items-center">

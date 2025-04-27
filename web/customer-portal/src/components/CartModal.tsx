@@ -15,9 +15,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const { 
     items,
     total, 
-    tax, 
-    deliveryFee, 
-    orderTotal, 
     isEmpty,
     clearCart,
     restaurantName
@@ -126,21 +123,9 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
                     <div className="border-t border-gray-200 dark:border-gray-700 py-6 px-4 sm:px-6">
                       <div className="flex justify-between text-base font-medium text-gray-900 dark:text-white">
                         <p>Subtotal</p>
-                        <p>${total.toFixed(2)}</p>
+                        <p>Rs. {total.toFixed(2)}</p>
                       </div>
-                      <div className="flex justify-between mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        <p>Tax</p>
-                        <p>${tax.toFixed(2)}</p>
-                      </div>
-                      <div className="flex justify-between mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        <p>Delivery Fee</p>
-                        <p>${deliveryFee.toFixed(2)}</p>
-                      </div>
-                      <div className="flex justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-base font-medium text-gray-900 dark:text-white">
-                        <p>Total</p>
-                        <p>${orderTotal.toFixed(2)}</p>
-                      </div>
-                      <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Shipping and taxes calculated at checkout.</p>
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Taxes and delivery fees will be calculated during checkout.</p>
                       <div className="mt-6">
                         <button
                           onClick={handleCheckout}

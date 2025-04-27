@@ -6,15 +6,15 @@ import { toast } from 'react-hot-toast';
 
 /**
  * This component listens for order updates across the entire application
- * It subscribes to all the user's active orders and updates the notification system
- * when any order status changes
+ * It now uses polling instead of SSE to check for order updates
  */
 const OrderUpdateListener: React.FC = () => {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
   const [activeOrders, setActiveOrders] = useState<string[]>([]);
-  const sseConnectionsRef = useRef<Record<string, EventSource | null>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to format status string
   const formatStatus = (status: string): string => {
@@ -46,6 +46,17 @@ const OrderUpdateListener: React.FC = () => {
             )
             .map((order: any) => order.orderId);
           
+          // Also store current status for each order
+          const statuses: Record<string, string> = {};
+          response.data.forEach((order: any) => {
+            statuses[order.orderId] = order.status;
+          });
+          
+          setOrderStatuses(prevStatuses => ({
+            ...prevStatuses,
+            ...statuses
+          }));
+          
           setActiveOrders(activeOrderIds);
         }
       } catch (error) {
@@ -63,98 +74,117 @@ const OrderUpdateListener: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [user?.id]);
 
-  // Set up SSE connections for each active order
+  // Set up polling for active orders instead of SSE
   useEffect(() => {
     // Skip if still loading or no active orders
     if (isLoading || activeOrders.length === 0) return;
     
-    // Create new SSE connections for each order
-    activeOrders.forEach(orderId => {
-      // Skip if connection already exists
-      if (sseConnectionsRef.current[orderId]) return;
-      
-      const eventSource = orderService.subscribeToOrderUpdates(orderId, (data) => {
-        // Process the update
-        if (data.type === 'status-update' && data.status) {
-          // Format the status for display
-          const formattedStatus = formatStatus(data.status);
-          
-          // Create a more descriptive message based on the status
-          let message = `Order #${orderId} `;
-          switch (data.status) {
-            case 'order-received':
-              message += 'has been received by the restaurant';
-              break;
-            case 'preparing-your-order':
-              message += 'is being prepared';
-              break;
-            case 'wrapping-up':
-              message += 'is being wrapped up';
-              break;
-            case 'picking-up':
-              message += 'is being picked up by the delivery partner';
-              break;
-            case 'heading-your-way':
-              message += 'is on its way to you';
-              break;
-            case 'delivered':
-              message += 'has been delivered';
-              break;
-            case 'cancelled':
-              message += 'has been cancelled';
-              break;
-            default:
-              message += `status updated to ${formattedStatus}`;
-          }
-          
-          // Add notification
-          addNotification({
-            type: 'order-status-update',
-            message,
-            orderId,
-            data: {
-              ...data.orderData,
-              formattedStatus,
-              status: data.status,
-              timestamp: new Date(),
-              restaurantName: data.orderData?.restaurant?.restaurantInfo?.restaurantName || 'Restaurant'
-            }
-          });
-          
-          // Show toast notification
-          toast.success(message, {
-            id: `order-update-${orderId}-${Date.now()}`,
-            duration: 5000
-          });
-          
-          // Dispatch a global event that any component can listen to
-          window.dispatchEvent(new CustomEvent('orderStatusUpdate', { 
-            detail: { 
-              orderId,
-              status: data.status,
-              formattedStatus,
-              data: data.orderData
-            }
-          }));
-        }
-      });
-      
-      // Store the connection
-      if (eventSource) {
-        sseConnectionsRef.current[orderId] = eventSource;
-      }
-    });
+    // Clear any existing polling interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
     
-    // Clean up function to close all SSE connections
-    return () => {
-      Object.entries(sseConnectionsRef.current).forEach(([orderId, eventSource]) => {
-        if (eventSource) {
-          eventSource.close();
+    // Function to check order status updates
+    const checkOrderUpdates = async () => {
+      for (const orderId of activeOrders) {
+        try {
+          const response = await orderService.getOrder(orderId);
+          
+          if (response.success && response.data) {
+            const order = response.data;
+            const newStatus = order.status;
+            const previousStatus = orderStatuses[orderId];
+            
+            // If status has changed, notify the user
+            if (previousStatus && newStatus && previousStatus !== newStatus) {
+              // Update the stored status
+              setOrderStatuses(prev => ({
+                ...prev,
+                [orderId]: newStatus
+              }));
+              
+              // Format the status for display
+              const formattedStatus = formatStatus(newStatus);
+              
+              // Create a more descriptive message based on the status
+              let message = `Order #${orderId} `;
+              switch (newStatus) {
+                case 'order-received':
+                  message += 'has been received by the restaurant';
+                  break;
+                case 'preparing-your-order':
+                  message += 'is being prepared';
+                  break;
+                case 'wrapping-up':
+                  message += 'is being wrapped up';
+                  break;
+                case 'picking-up':
+                  message += 'is being picked up by the delivery partner';
+                  break;
+                case 'heading-your-way':
+                  message += 'is on its way to you';
+                  break;
+                case 'delivered':
+                  message += 'has been delivered';
+                  break;
+                case 'cancelled':
+                  message += 'has been cancelled';
+                  break;
+                default:
+                  message += `status updated to ${formattedStatus}`;
+              }
+              
+              // Add notification
+              addNotification({
+                type: 'order-status-update',
+                message,
+                orderId,
+                data: {
+                  ...order,
+                  formattedStatus,
+                  status: newStatus,
+                  timestamp: new Date(),
+                  restaurantName: order?.restaurant?.restaurantInfo?.restaurantName || 'Restaurant'
+                }
+              });
+              
+              // Show toast notification
+              toast.success(message, {
+                id: `order-update-${orderId}-${Date.now()}`,
+                duration: 5000
+              });
+              
+              // Dispatch a global event that any component can listen to
+              window.dispatchEvent(new CustomEvent('orderStatusUpdate', { 
+                detail: { 
+                  orderId,
+                  status: newStatus,
+                  formattedStatus,
+                  data: order
+                }
+              }));
+            }
+          }
+        } catch (error) {
+          console.error(`Error checking updates for order ${orderId}:`, error);
         }
-      });
-      sseConnectionsRef.current = {};
+      }
     };
-  }, [activeOrders, isLoading, addNotification]);
+    
+    // Initial check
+    checkOrderUpdates();
+    
+    // Set up polling interval (every 30 seconds)
+    pollingIntervalRef.current = setInterval(checkOrderUpdates, 30000);
+    
+    // Clean up polling on unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [activeOrders, isLoading, orderStatuses, addNotification]);
 
   // This component doesn't render anything
   return null;

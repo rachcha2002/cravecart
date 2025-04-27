@@ -7,6 +7,7 @@ import { Platform } from "react-native";
 const getApiUrl = () => {
   if (Platform.OS === "android") {
     // For Android emulator - this special IP points to host machine's localhost
+
     return "http://192.168.1.153:3001/api";
   } else if (Platform.OS === "ios") {
     // For iOS simulator
@@ -21,6 +22,7 @@ const getNotificationApiUrl = () => {
   if (Platform.OS === "android") {
     // For Android emulator - this special IP points to host machine's localhost
     return "http://192.168.1.153:5005/api";
+
   } else if (Platform.OS === "ios") {
     // For iOS simulator
     return "http://localhost:3001/api";
