@@ -104,6 +104,27 @@ const updateUser = async (req, res) => {
     // Update user fields
     const updateData = { ...req.body, updatedAt: Date.now() };
 
+    if (updateData.restaurantInfo && updateData.restaurantInfo.images) {
+      // Process images before saving
+      updateData.restaurantInfo.images = updateData.restaurantInfo.images.map(
+        (image) => {
+          // Check if image has a MongoDB ObjectId (_id is 24 chars)
+          const isExistingImage =
+            typeof image._id === "string" &&
+            /^[0-9a-fA-F]{24}$/.test(image._id);
+
+          // For existing images, keep the _id
+          if (isExistingImage) {
+            return image;
+          }
+
+          // For new images, remove the temporary _id so MongoDB can generate a proper one
+          const { _id, ...imageWithoutId } = image;
+          return imageWithoutId;
+        }
+      );
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { $set: updateData },
