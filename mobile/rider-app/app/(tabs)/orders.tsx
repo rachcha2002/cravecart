@@ -10,6 +10,7 @@ import { API_URLS } from '../../src/api/authApi';
 interface Restaurant {
   _id: string;
   name: string;
+  restaurantName: string;
   address: string;
   location: {
     type: string;
@@ -315,7 +316,7 @@ export default function OrdersScreen() {
             body: JSON.stringify({
               userIds: [order.user._id],
               title: 'Order Update',
-              message: `Your order from ${order.restaurant.name} is now being picked up by your driver.`,
+              message: `Your order from ${order.restaurant.restaurantName} is now being picked up by your driver.`,
               channels: ['sms', 'in-app'] // As requested, SMS and in-app
             })
           });
@@ -389,7 +390,7 @@ export default function OrdersScreen() {
             body: JSON.stringify({
               userIds: [order.user._id],
               title: 'Order Update',
-              message: `Your order from ${order.restaurant.name} is on the way! Your driver has picked up your food.`,
+              message: `Your order from ${order.restaurant.restaurantName} is on the way! Your driver has picked up your food.`,
               channels: ['sms', 'in-app']
             })
           });
@@ -449,7 +450,7 @@ export default function OrdersScreen() {
             body: JSON.stringify({
               userIds: [order.user._id],
               title: 'Order Delivered',
-              message: `Your order from ${order.restaurant.name} has been delivered! Enjoy your meal.`,
+              message: `Your order from ${order.restaurant.restaurantName} has been delivered! Enjoy your meal.`,
               channels: ['sms', 'in-app']
             })
           });
@@ -746,7 +747,7 @@ export default function OrdersScreen() {
 
                     <View style={styles.infoRow}>
                        <Ionicons name="restaurant-outline" size={16} color="#555" style={styles.icon} />
-                       <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.name}</Text>
+                       <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.restaurantName}</Text>
                     </View>
                     <View style={styles.infoRow}>
                        <Ionicons name="location-outline" size={16} color="#555" style={styles.icon} />
@@ -763,7 +764,7 @@ export default function OrdersScreen() {
                     {expandedOrderId === order._id && (
                       <View style={styles.expandedDetails}>
                         <Text style={styles.detailTitle}>Details</Text>
-                        <Text style={styles.detailText}>Restaurant: {order.restaurant.name} ({order.restaurant.address})</Text>
+                        <Text style={styles.detailText}>Restaurant: {order.restaurant.restaurantName} ({order.restaurant.address})</Text>
                         <Text style={styles.detailText}>Customer: {order.user.name}</Text>
                         <Text style={styles.detailText}>Deliver To: {order.deliveryAddress}</Text>
                         {order.deliveryInstructions && <Text style={styles.detailText}>Instructions: {order.deliveryInstructions}</Text>}
