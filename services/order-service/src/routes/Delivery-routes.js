@@ -3,6 +3,6 @@ const router = express.Router();
 const DeliveryController = require('../controllers/Delivery.controller');
 
 router.post('/nearbyorders', DeliveryController.findNearbyWrappingOrders);
-router.put('/orders/:orderId/status', DeliveryController.updateOrderStatus);
+router.patch('/orders/:orderId/status', DeliveryController.updateOrderStatus);
 
 module.exports = router;

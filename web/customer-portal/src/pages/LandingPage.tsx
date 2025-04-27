@@ -143,22 +143,10 @@ const LandingPage: React.FC = () => {
               className="w-full sm:w-auto"
             >
               <Link
-                to="/menu"
+                to="/restaurants"
                 className={`w-full sm:w-auto px-8 py-4 rounded-full text-lg font-semibold bg-gradient-to-r from-[#f29f05] to-[#ffc107] hover:from-[#e69504] hover:to-[#e6af06] text-white transition-all duration-300 shadow-lg hover:shadow-xl inline-block text-center`}
               >
                 Order Now
-              </Link>
-            </motion.div>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-full sm:w-auto"
-            >
-              <Link
-                to="/restaurants"
-                className={`w-full sm:w-auto px-8 py-4 rounded-full text-lg font-semibold border-2 border-[#f29f05] text-[#f29f05] hover:bg-[#f29f05]/10 dark:hover:bg-gray-800 transition-all duration-300 inline-block text-center`}
-              >
-                View Restaurants
               </Link>
             </motion.div>
           </motion.div>
