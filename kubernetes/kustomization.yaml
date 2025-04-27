@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Deployments
+  - deployments/user-service.yaml
+  - deployments/restaurant-service.yaml
+  - deployments/order-service.yaml
+  - deployments/payment-service.yaml
+  - deployments/delivery-service.yaml
+  - deployments/notification-service.yaml
+  
+  # Services
+  - services/user-service.yaml
+  - services/restaurant-service.yaml
+  - services/order-service.yaml
+  - services/payment-service.yaml
+  - services/delivery-service.yaml
+  - services/notification-service.yaml
+  
+  # ConfigMaps
+  - configmaps/user-service-config.yaml
+  - configmaps/restaurant-service-config.yaml
+  - configmaps/order-service-config.yaml
+  - configmaps/payment-service-config.yaml
+  - configmaps/delivery-service-config.yaml
+  - configmaps/notification-service-config.yaml
+  
+  # Secrets
+  - secrets/app-secrets.yaml 

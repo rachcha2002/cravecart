@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+data:
+  PORT: "5005"
+  NODE_ENV: "production"
+  MONGODB_URI: "mongodb+srv://cravecartlk:cravecart123@cluster0.8qk0a8n.mongodb.net/cravecart-notifications"
+  EMAIL_SERVICE: "smtp"
+  EMAIL_HOST: "smtp.example.com"
+  EMAIL_PORT: "587"
+  EMAIL_USER: "notifications@example.com"
+  SMS_PROVIDER_URL: "https://sms-provider.example.com/api/send"
+  LOG_LEVEL: "info" 
