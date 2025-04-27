@@ -11,6 +11,8 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
 import { AuthProvider } from "../src/context/AuthContext";
+import { NotificationsProvider } from "../src/context/NotificationsContext";
+import { NotificationHandler } from "../src/components/NotificationHandler";
 import { useColorScheme } from "@/src/hooks/useColorScheme";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -34,18 +36,24 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="register" />
-          <Stack.Screen name="verification-pending" />
-          <Stack.Screen name="change-password" />
-          <Stack.Screen name="update-documents" />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <NotificationsProvider>
+        <NotificationHandler />
+        <ThemeProvider
+          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+        >
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="verification-pending" />
+            <Stack.Screen name="change-password" />
+            <Stack.Screen name="update-documents" />
+            <Stack.Screen name="notifications" />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

@@ -7,7 +7,20 @@ import { Platform } from "react-native";
 const getApiUrl = () => {
   if (Platform.OS === "android") {
     // For Android emulator - this special IP points to host machine's localhost
-    return "http://192.168.97.59:3001/api";
+    return "http://192.168.1.153:3001/api";
+  } else if (Platform.OS === "ios") {
+    // For iOS simulator
+    return "http://localhost:3001/api";
+  } else {
+    // For web or fallback
+    return "http://localhost:3001/api";
+  }
+};
+
+const getNotificationApiUrl = () => {
+  if (Platform.OS === "android") {
+    // For Android emulator - this special IP points to host machine's localhost
+    return "http://192.168.1.153:5005/api";
   } else if (Platform.OS === "ios") {
     // For iOS simulator
     return "http://localhost:3001/api";
@@ -18,6 +31,8 @@ const getApiUrl = () => {
 };
 
 const API_URL = getApiUrl();
+const NOTIFICATION_API_URL = getNotificationApiUrl();
+console.log("Using Notification API URL:", NOTIFICATION_API_URL);
 console.log("Using API URL:", API_URL);
 
 const api = axios.create({
@@ -69,6 +84,9 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
+  getApiUrl: () => API_URL,
+  getNotificationApiUrl: () => NOTIFICATION_API_URL,
+
   login: async (email: string, password: string) => {
     try {
       const response = await api.post("/auth/login", { email, password });
@@ -227,5 +245,89 @@ export const authApi = {
   logout: async () => {
     await AsyncStorage.removeItem("token");
     return { success: true };
+  },
+
+  // Register device token
+  registerDeviceToken: async (token: string, platform: string) => {
+    try {
+      // Get current user to get ID
+      const currentUser = await authApi.getCurrentUser();
+      const userId = currentUser.user._id;
+
+      const response = await api.post(`/users/pushes/${userId}/device-tokens`, {
+        token,
+        platform,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Register device token API call failed:", error);
+      throw error;
+    }
+  },
+
+  // Remove device token
+  removeDeviceToken: async (token: string) => {
+    try {
+      // Get current user to get ID
+      const currentUser = await authApi.getCurrentUser();
+      const userId = currentUser.user._id;
+
+      const response = await api.delete(
+        `/users/pushes/${userId}/device-tokens/${token}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Remove device token API call failed:", error);
+      throw error;
+    }
+  },
+
+  getUnreadNotifications: async (userId: string) => {
+    try {
+      const response = await fetch(
+        `${NOTIFICATION_API_URL}/notifications/unread/${userId}`
+      );
+      return await response.json();
+    } catch (error) {
+      console.error("Get unread notifications failed:", error);
+      throw error;
+    }
+  },
+
+  // Get unread count
+  getUnreadNotificationsCount: async (userId: string) => {
+    try {
+      const response = await fetch(
+        `${NOTIFICATION_API_URL}/notifications/unread/${userId}/count`
+      );
+      return await response.json();
+    } catch (error) {
+      console.error("Get unread count failed:", error);
+      throw error;
+    }
+  },
+
+  // Mark notification as read
+  markNotificationAsRead: async (
+    notificationId: string,
+    userId: string,
+    userType: string
+  ) => {
+    try {
+      const response = await fetch(
+        `${NOTIFICATION_API_URL}/notifications/${notificationId}/read`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId, userType }),
+        }
+      );
+      return await response.json();
+    } catch (error) {
+      console.error("Mark notification as read failed:", error);
+      throw error;
+    }
   },
 };
