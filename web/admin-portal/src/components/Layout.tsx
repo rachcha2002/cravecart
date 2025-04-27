@@ -11,7 +11,6 @@ const Layout = () => {
     { name: "Users", path: "/users", icon: "👥" },
     { name: "Restaurants", path: "/restaurants", icon: "🍽️" },
     { name: "Orders", path: "/orders", icon: "📦" },
-   
   ];
 
   const toggleSidebar = () => {
@@ -26,6 +25,15 @@ const Layout = () => {
           isSidebarOpen ? "w-64" : "w-20"
         } bg-white shadow-lg transition-all duration-300`}
       >
+        <div className="flex justify-center items-center py-4 border-b">
+          <img
+            src="/logo.png"
+            alt="CraveCart Logo"
+            className={`${
+              isSidebarOpen ? "w-40" : "w-12"
+            } transition-all duration-300`}
+          />
+        </div>
         <nav className="p-4">
           <ul className="space-y-2">
             {navigation.map((item) => (

@@ -26,7 +26,11 @@ const Layout: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <span className="text-white font-bold text-xl">CraveCart</span>
+                <img
+                  src="/logo.png"
+                  alt="CraveCart Logo"
+                  className="mx-auto mt-4 w-32 mb-4"
+                />
               </div>
               <div className="hidden md:block">
                 <div className="ml-10 flex items-baseline space-x-4">
@@ -70,7 +74,7 @@ const Layout: React.FC = () => {
                 <div className="mr-4">
                   <NotificationBell />
                 </div>
-                
+
                 <button
                   onClick={logout}
                   className="bg-gray-800 p-1 rounded-full text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
