@@ -124,7 +124,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <span className="font-semibold text-lg dark:text-white">${total.toFixed(2)}</span>
+            <span className="font-semibold text-lg dark:text-white">Rs. {total.toFixed(2)}</span>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mt-2 ${getStatusColor()}`}>
               {getStatusIcon()}
               {getStatusText()}

@@ -433,7 +433,7 @@ const OrderDetailPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    <span className="font-medium dark:text-white self-end sm:self-center">${(item.price * (item.quantity ?? 1)).toFixed(2)}</span>
+                    <span className="font-medium dark:text-white self-end sm:self-center">Rs. {(item.price * (item.quantity ?? 1)).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -444,19 +444,19 @@ const OrderDetailPage: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                  <span className="dark:text-white">${orderDetails.subtotal.toFixed(2)}</span>
+                  <span className="dark:text-white">Rs. {orderDetails.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
-                  <span className="dark:text-white">${orderDetails.deliveryFee.toFixed(2)}</span>
+                  <span className="dark:text-white">Rs. {orderDetails.deliveryFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Tax</span>
-                  <span className="dark:text-white">${orderDetails.tax.toFixed(2)}</span>
+                  <span className="dark:text-white">Rs. {orderDetails.tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-lg mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <span className="dark:text-white">Total</span>
-                  <span className="dark:text-white">${orderDetails.total.toFixed(2)}</span>
+                  <span className="dark:text-white">Rs. {orderDetails.total.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center mt-3 text-sm text-gray-600 dark:text-gray-400">
                   <CreditCardIcon className="h-4 w-4 mr-2" />

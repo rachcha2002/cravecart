@@ -147,22 +147,22 @@ const PaymentSuccessPage: React.FC = () => {
                   <h3 className="font-medium dark:text-white">Order Summary</h3>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Food Subtotal:</span>
-                    <span className="dark:text-white">${formatCurrency(calculatedOrderData.foodSubtotal)}</span>
+                    <span className="dark:text-white">{formatCurrency(calculatedOrderData.foodSubtotal)}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Delivery Fee:</span>
-                    <span className="dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.totalDeliveryFee)}</span>
+                    <span className="dark:text-white">{formatCurrency(calculatedOrderData.priceBreakdown.totalDeliveryFee)}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Service & Tax:</span>
-                    <span className="dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.serviceFee + calculatedOrderData.priceBreakdown.tax)}</span>
+                    <span className="dark:text-white">{formatCurrency(calculatedOrderData.priceBreakdown.serviceFee + calculatedOrderData.priceBreakdown.tax)}</span>
                   </div>
                   
                   <div className="flex justify-between font-medium pt-2 mt-2 border-t border-gray-200 dark:border-gray-700">
                     <span className="dark:text-white">Total:</span>
-                    <span className="dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.total)}</span>
+                    <span className="dark:text-white">{formatCurrency(calculatedOrderData.priceBreakdown.total)}</span>
                   </div>
                   
                   <div className="flex justify-between text-sm">
@@ -184,7 +184,7 @@ const PaymentSuccessPage: React.FC = () => {
                         {item.quantity || 1} × {item.name}
                       </span>
                       <span className="dark:text-white">
-                        ${formatCurrency(item.price * (item.quantity || 1))}
+                        {formatCurrency(item.price * (item.quantity || 1))}
                       </span>
                     </li>
                   ))}
