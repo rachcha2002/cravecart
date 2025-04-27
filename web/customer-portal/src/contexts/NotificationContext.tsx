@@ -545,3 +545,4 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     </NotificationContext.Provider>
   );
 };
+

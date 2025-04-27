@@ -21,14 +21,10 @@ interface CartContextType {
   clearCart: () => void;
   restoreCart: (cartItems: CartItem[]) => void;
   itemCount: number;
-  subtotal: number;
-  tax: number;
-  deliveryFee: number;
-  orderTotal: number;
+  total: number;
   isEmpty: boolean;
   restaurantId: string | null;
   restaurantName: string | null;
-  total: number;
 }
 
 // Create context with default values
@@ -41,14 +37,10 @@ const CartContext = createContext<CartContextType>({
   clearCart: () => {},
   restoreCart: () => {},
   itemCount: 0,
-  subtotal: 0,
-  tax: 0,
-  deliveryFee: 0,
-  orderTotal: 0,
+  total: 0,
   isEmpty: true,
   restaurantId: null,
   restaurantName: null,
-  total: 0,
 });
 
 // Provider component
@@ -68,11 +60,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   // Calculate derived values
   const itemCount = items.reduce((total, item) => total + (item.quantity || 1), 0);
-  const subtotal = items.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0);
-  const total = subtotal;
-  const tax = subtotal * 0.08;
-  const deliveryFee = items.length > 0 ? 3.99 : 0;
-  const orderTotal = subtotal + tax + deliveryFee;
+  const total = items.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0);
   const isEmpty = items.length === 0;
 
   // Save to localStorage whenever cart changes
@@ -165,11 +153,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         clearCart,
         restoreCart,
         itemCount,
-        subtotal,
         total,
-        tax,
-        deliveryFee,
-        orderTotal,
         isEmpty,
         restaurantId,
         restaurantName,

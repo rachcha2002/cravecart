@@ -273,12 +273,15 @@ export default function OrdersScreen() {
   const handleAcceptOrder = async (orderId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
-        method: 'PUT',
+      const response = await fetch(`http://192.168.26.1:5003/api/deliveries/orders/${orderId}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'picking-up' })
+        body: JSON.stringify({ 
+          status: 'picking-up',
+          driver: user  // Include the entire user object from useAuth
+        })
       });
 
       if (!response.ok) {

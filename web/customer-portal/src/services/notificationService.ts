@@ -122,12 +122,12 @@ const notificationService = {
       // Create an itemized list for the email
       const itemsList = items && items.length > 0
         ? items
-            .map(item => `${item.quantity || 1} × ${item.name} - $${(item.price * (item.quantity || 1)).toFixed(2)}`)
+            .map(item => `${item.quantity || 1} × ${item.name} - Rs. ${(item.price * (item.quantity || 1)).toFixed(2)}`)
             .join('<br>')
         : 'No items';
 
       // Format the order total
-      const formattedTotal = `$${orderTotal.toFixed(2)}`;
+      const formattedTotal = `Rs. ${orderTotal.toFixed(2)}`;
 
       // Build the message with order details (simplified for reliability)
       const htmlContent = `

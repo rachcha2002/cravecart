@@ -58,10 +58,10 @@ const PaymentForm = () => {
   const orderNumber = location.state?.orderNumber;
 
   // Calculate exchange rate (in a real app, this would come from an API)
-  const USD_TO_LKR_RATE = 325; // Example conversion rate
+  const USD_TO_LKR_RATE = 1; // Changed from 325 to 1 to remove conversion
   // Calculate payment amount based on the total from price breakdown
   const PAYMENT_AMOUNT = calculatedOrderTotal 
-    ? Math.round(calculatedOrderTotal * USD_TO_LKR_RATE) 
+    ? Math.round(calculatedOrderTotal) 
     : 1000; // Fallback to fixed amount
   const PAYMENT_CURRENCY = 'lkr'; // Must be lowercase for Stripe
 
@@ -352,14 +352,13 @@ const PaymentForm = () => {
 
   // Display amounts in LKR format
   const formatLKR = (amount: number) => {
-    return `${amount.toFixed(2)} LKR`;
+    return formatCurrency(amount);
   };
 
   // For displaying order items (convert USD to LKR for display)
   const displayItemPrice = (priceUSD: number, quantity: number = 1) => {
-    // Simple conversion for display purposes
-    const priceLKR = Math.round(priceUSD * 300 * quantity); // Approximate USD to LKR conversion
-    return formatLKR(priceLKR);
+    // No conversion needed
+    return formatCurrency(priceUSD * quantity);
   };
 
   return (
@@ -372,25 +371,24 @@ const PaymentForm = () => {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">Food Subtotal</span>
-              <span className="font-medium dark:text-white">${formatCurrency(calculatedOrderData.foodSubtotal)}</span>
+              <span className="font-medium dark:text-white">{formatCurrency(calculatedOrderData.foodSubtotal)}</span>
             </div>
             
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">Delivery Fee</span>
-              <span className="font-medium dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.totalDeliveryFee)}</span>
+              <span className="font-medium dark:text-white">{formatCurrency(calculatedOrderData.priceBreakdown.totalDeliveryFee)}</span>
             </div>
             
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">Service & Tax</span>
-              <span className="font-medium dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.serviceFee + calculatedOrderData.priceBreakdown.tax)}</span>
+              <span className="font-medium dark:text-white">{formatCurrency(calculatedOrderData.priceBreakdown.serviceFee + calculatedOrderData.priceBreakdown.tax)}</span>
             </div>
             
             <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center">
                 <span className="font-semibold dark:text-white">Total</span>
                 <div className="text-right">
-                  <div className="font-bold text-lg dark:text-white">${formatCurrency(calculatedOrderData.priceBreakdown.total)}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Rs. {(calculatedOrderData.priceBreakdown.total * USD_TO_LKR_RATE).toFixed(2)}</div>
+                  <div className="font-bold text-lg dark:text-white">{formatCurrency(calculatedOrderData.priceBreakdown.total)}</div>
                 </div>
               </div>
             </div>
