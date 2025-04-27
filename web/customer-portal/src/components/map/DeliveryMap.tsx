@@ -1,323 +1,339 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
+import 'leaflet-routing-machine';
+import { toast } from 'react-hot-toast';
 
-interface DeliveryMapProps {
-  riderLocation: { latitude: number; longitude: number } | null;
-  deliveryLocation: { latitude: number; longitude: number };
-  height?: string;
+// Add missing type declarations for leaflet-routing-machine
+declare module 'leaflet' {
+  namespace Routing {
+    function control(options: any): any;
+  }
 }
 
-const DeliveryMap: React.FC<DeliveryMapProps> = ({ 
-  riderLocation, 
+interface DeliveryMapProps {
+  riderLocation: {latitude: number, longitude: number} | null;
+  deliveryLocation: {latitude: number, longitude: number};
+  restaurantLocation?: {latitude: number, longitude: number};
+  height: string;
+  showDirections?: boolean;
+  directionsDestination?: 'restaurant' | 'customer';
+}
+
+// Add interfaces for the event parameters
+interface RoutingErrorEvent {
+  error: Error;
+  target: any;
+}
+
+interface RoutesFoundEvent {
+  routes: Array<any>;
+  waypoints: Array<any>;
+  target: any;
+}
+
+const DeliveryMap: React.FC<DeliveryMapProps> = ({
+  riderLocation,
   deliveryLocation,
-  height = '400px' 
+  restaurantLocation,
+  height = '400px',
+  showDirections = true, // Default to showing directions
+  directionsDestination = 'customer'
 }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const mapRef = useRef<L.Map | null>(null);
   const routingControlRef = useRef<any>(null);
-  const deliveryMarkerRef = useRef<any>(null);
-  const riderMarkerRef = useRef<any>(null);
-  const leafletLoadedRef = useRef(false);
+  const mapInitializedRef = useRef<boolean>(false);
+  const mapIdRef = useRef<string>(`map-${Math.random().toString(36).substr(2, 9)}`);
+  const riderMarkerRef = useRef<L.Marker | null>(null);
+  const routeLayersRef = useRef<{[key: string]: L.Layer}>({});
   
-  // Load Leaflet dynamically on client-side only
+  // Add a state to track if the map is fully loaded and ready for routing
+  const [mapReady, setMapReady] = useState<boolean>(false);
+  
+  // Initialize the map once
   useEffect(() => {
-    const loadLeaflet = async () => {
-      if (typeof window !== 'undefined' && !leafletLoadedRef.current) {
-        try {
-          // Import Leaflet
-          const L = await import('leaflet');
-          
-          // Store Leaflet in window
-          window.L = L;
-          
-          // Fix icon paths without using _getIconUrl
-          window.L.Icon.Default.imagePath = 'https://unpkg.com/leaflet@1.9.4/dist/images/';
-          
-          // Create custom default icon options
-          const defaultIconOptions = {
-            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-          };
-          
-          // Set as default icon
-          window.L.Marker.prototype.options.icon = window.L.icon(defaultIconOptions);
-          
-          // Import routing machine explicitly
+    if (!mapRef.current && !mapInitializedRef.current) {
+      mapInitializedRef.current = true;
+      
+      try {
+        // Initialize map with a bit of delay to ensure the container is rendered
+        setTimeout(() => {
+          // Safely initialize the map
           try {
-            await import('leaflet-routing-machine');
-            console.log('✅ Leaflet routing machine loaded successfully');
-          } catch (routingError) {
-            console.error('❌ Error loading routing machine:', routingError);
+            console.log(`Creating map with ID: ${mapIdRef.current}`);
+            const map = L.map(mapIdRef.current, {
+              renderer: L.canvas(), // Use canvas renderer for better performance
+              preferCanvas: true
+            }).setView([deliveryLocation.latitude, deliveryLocation.longitude], 15);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Set mapReady after a timeout to ensure map is fully initialized
+            setTimeout(() => {
+              setMapReady(true);
+              console.log('Map is ready for routing');
+            }, 1000);
+  
+            // Create custom markers
+            const deliveryMarkerIcon = L.icon({
+              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+              shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41]
+            });
+  
+            // Add delivery location marker with red icon
+            L.marker([deliveryLocation.latitude, deliveryLocation.longitude], { 
+              icon: deliveryMarkerIcon,
+              zIndexOffset: 1000 // Ensure delivery marker is on top
+            })
+              .addTo(map)
+              .bindPopup('<strong>Delivery Location</strong>');
+  
+            // Add restaurant location marker if available
+            if (restaurantLocation && restaurantLocation.latitude && restaurantLocation.longitude) {
+              const restaurantMarkerIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+              });
+              
+              L.marker([restaurantLocation.latitude, restaurantLocation.longitude], { 
+                icon: restaurantMarkerIcon 
+              })
+                .addTo(map)
+                .bindPopup('Restaurant Location');
+            }
+  
+            // Store map reference
+            mapRef.current = map;
+            
+            // Trigger a resize after a short delay to ensure the map displays correctly
+            setTimeout(() => {
+              if (mapRef.current) {
+                mapRef.current.invalidateSize();
+              }
+            }, 100);
+          } catch (err) {
+            console.error('Error initializing map:', err);
+            toast.error('Could not initialize map. Please try again.');
+          }
+        }, 100);
+        
+      } catch (err) {
+        console.error('Error in map initialization:', err);
+      }
+    }
+    
+    // Cleanup function
+    return () => {};
+  }, [deliveryLocation, restaurantLocation]);
+
+  // Update rider marker and routing in a separate effect
+  useEffect(() => {
+    // Only proceed if map is initialized and ready
+    if (!mapRef.current || !mapReady) {
+      console.log('Map not ready for rider location update');
+      return;
+    }
+    
+    // Only update rider marker if we have rider location
+    if (riderLocation) {
+      const map = mapRef.current;
+
+      try {
+        // Create rider marker icon (green)
+        const riderMarkerIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+
+        // Remove previous rider marker if it exists
+        if (riderMarkerRef.current) {
+          map.removeLayer(riderMarkerRef.current);
+        }
+
+        // Add new rider marker
+        riderMarkerRef.current = L.marker([riderLocation.latitude, riderLocation.longitude], {
+          icon: riderMarkerIcon
+        }).addTo(map).bindPopup('Delivery Driver');
+
+        // Handle routing separately, only when map is ready
+        if (showDirections) {
+          try {
+            // First remove any existing routing control safely
+            if (routingControlRef.current) {
+              try {
+                // Store reference to layers before removing control
+                const layers = routingControlRef.current.getPlan().getWaypoints();
+                console.log('Removing existing routing control');
+                
+                // Remove each layer explicitly first to avoid removeLayer errors
+                routingControlRef.current.getPlan()._dragMarkerLayerGroup.clearLayers();
+                routingControlRef.current._line.clearLayers();
+                
+                map.removeControl(routingControlRef.current);
+                routingControlRef.current = null;
+                
+                // Clear any stored route layers
+                Object.values(routeLayersRef.current).forEach(layer => {
+                  if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                  }
+                });
+                routeLayersRef.current = {};
+              } catch (routingErr) {
+                console.warn('Non-fatal error removing routing control:', routingErr);
+              }
+            }
+
+            // Add routing with a safe delay
+            setTimeout(() => {
+              if (!mapRef.current || !riderLocation) return;
+              
+              try {
+                const destLat = directionsDestination === 'restaurant' && restaurantLocation
+                  ? restaurantLocation.latitude
+                  : deliveryLocation.latitude;
+
+                const destLng = directionsDestination === 'restaurant' && restaurantLocation
+                  ? restaurantLocation.longitude
+                  : deliveryLocation.longitude;
+                
+                console.log('Creating new routing control');
+                
+                // Create a new routing control with safer options
+                const routingControl = L.Routing.control({
+                  waypoints: [
+                    L.latLng(riderLocation.latitude, riderLocation.longitude),
+                    L.latLng(destLat, destLng)
+                  ],
+                  routeWhileDragging: false,
+                  showAlternatives: false,
+                  fitSelectedRoutes: false,
+                  show: false,
+                  createMarker: function() { return null; }, // Don't create markers
+                  lineOptions: {
+                    styles: [{ color: '#3388ff', opacity: 0.7, weight: 5 }]
+                  },
+                  addWaypoints: false,
+                  draggableWaypoints: false,
+                  useZoomParameter: false,
+                  autoRoute: true
+                });
+                
+                // Add route error handling with proper typing
+                routingControl.on('routingerror', function(e: RoutingErrorEvent) {
+                  console.error('Routing error:', e.error);
+                });
+                
+                // Store custom references to route layers for cleanup with proper typing
+                routingControl.on('routesfound', function(e: RoutesFoundEvent) {
+                  const routes = e.routes;
+                  if (routes && routes.length > 0) {
+                    // Store reference to route layers for manual cleanup
+                    const routeId = `route-${Date.now()}`;
+                    routeLayersRef.current[routeId] = routingControl._line;
+                  }
+                });
+                
+                // Add to map and store reference
+                routingControl.addTo(mapRef.current);
+                routingControlRef.current = routingControl;
+                
+              } catch (err) {
+                console.error('Error creating routing:', err);
+              }
+            }, 1000); // Longer delay for routing creation
+          } catch (err) {
+            console.error('Error in routing setup:', err);
+          }
+        }
+
+        // Fit bounds to include all points
+        const bounds = L.latLngBounds(
+          [riderLocation.latitude, riderLocation.longitude],
+          [deliveryLocation.latitude, deliveryLocation.longitude]
+        );
+
+        if (restaurantLocation && restaurantLocation.latitude && restaurantLocation.longitude) {
+          bounds.extend([restaurantLocation.latitude, restaurantLocation.longitude]);
+        }
+
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      } catch (err) {
+        console.error('Error updating rider position:', err);
+      }
+    }
+    
+  }, [riderLocation, mapReady, deliveryLocation, restaurantLocation, showDirections, directionsDestination]);
+
+  // Enhanced cleanup effect
+  useEffect(() => {
+    return () => {
+      console.log('Cleaning up map component');
+      // Safely cleanup routing control
+      try {
+        if (routingControlRef.current && mapRef.current) {
+          // Remove each layer type explicitly
+          try {
+            const plan = routingControlRef.current.getPlan();
+            if (plan && plan._dragMarkerLayerGroup) {
+              plan._dragMarkerLayerGroup.clearLayers();
+            }
+          } catch (e) {
+            console.log('Error cleaning routing plan:', e);
           }
           
-          leafletLoadedRef.current = true;
-          console.log('✅ Leaflet loaded successfully');
+          // Remove routing control from map
+          mapRef.current.removeControl(routingControlRef.current);
+          routingControlRef.current = null;
           
-          // Initialize map
-          initializeMap();
-        } catch (error) {
-          console.error('❌ Failed to load Leaflet:', error);
+          // Remove stored route layers
+          Object.values(routeLayersRef.current).forEach(layer => {
+            if (mapRef.current && mapRef.current.hasLayer(layer)) {
+              mapRef.current.removeLayer(layer);
+            }
+          });
+          routeLayersRef.current = {};
+        }
+      } catch (err) {
+        console.log('Cleanup routing error:', err);
+      }
+      
+      // Remove rider marker if it exists
+      if (riderMarkerRef.current && mapRef.current) {
+        try {
+          mapRef.current.removeLayer(riderMarkerRef.current);
+          riderMarkerRef.current = null;
+        } catch (err) {
+          console.log('Error removing rider marker:', err);
         }
       }
-    };
-
-    loadLeaflet();
-    
-    return () => {
-      // Cleanup
-      if (mapInstanceRef.current) {
-        console.log('🧹 Cleaning up map instance');
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
+      
+      // Safely remove the map
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        mapInitializedRef.current = false;
+        setMapReady(false);
       }
     };
   }, []);
 
-  // Initialize map when component mounts and Leaflet is loaded
-  const initializeMap = () => {
-    if (!mapRef.current || !window.L || mapInstanceRef.current) return;
-    
-    const L = window.L;
-    
-    try {
-      console.log('🗺️ Creating map with delivery location:', deliveryLocation);
-      
-      // Create map instance
-      const map = L.map(mapRef.current).setView(
-        [deliveryLocation.latitude, deliveryLocation.longitude],
-        15
-      );
-
-      // Add OpenStreetMap tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(map);
-
-      // Store map instance
-      mapInstanceRef.current = map;
-
-      // Create delivery location marker
-      const deliveryIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [12, 41]
-      });
-      
-      // Add marker for delivery location
-      deliveryMarkerRef.current = L.marker([deliveryLocation.latitude, deliveryLocation.longitude], { 
-        icon: deliveryIcon 
-      })
-      .addTo(map)
-      .bindPopup('Delivery Location')
-      .openPopup();
-
-      // If rider location is already available, update it
-      if (riderLocation) {
-        console.log('🚚 Initial rider location available:', riderLocation);
-        updateRiderLocation(riderLocation);
-      } else {
-        console.log('⚠️ No rider location available yet');
-      }
-      
-      console.log('✅ Map initialized successfully');
-    } catch (error) {
-      console.error('❌ Error initializing map:', error);
-    }
-  };
-
-  // Update map when delivery location changes
-  useEffect(() => {
-    if (!window.L || !mapInstanceRef.current) return;
-    
-    const L = window.L;
-    
-    try {
-      console.log('📍 Updating delivery location on map:', deliveryLocation);
-      
-      // Update delivery marker position
-      if (deliveryMarkerRef.current) {
-        mapInstanceRef.current.removeLayer(deliveryMarkerRef.current);
-      }
-
-      const deliveryIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [12, 41]
-      });
-      
-      deliveryMarkerRef.current = L.marker([deliveryLocation.latitude, deliveryLocation.longitude], { 
-        icon: deliveryIcon 
-      })
-      .addTo(mapInstanceRef.current)
-      .bindPopup('Delivery Location')
-      .openPopup();
-
-      // Update routing if rider location exists
-      if (riderLocation) {
-        updateRiderLocation(riderLocation);
-      } else {
-        // If no rider location, just center on delivery location
-        mapInstanceRef.current.setView([deliveryLocation.latitude, deliveryLocation.longitude], 15);
-      }
-    } catch (error) {
-      console.error('❌ Error updating delivery location:', error);
-    }
-  }, [deliveryLocation]);
-
-  // Update rider location and routing
-  const updateRiderLocation = (location: { latitude: number; longitude: number }) => {
-    if (!window.L || !mapInstanceRef.current) return;
-    
-    const L = window.L;
-    
-    try {
-      const map = mapInstanceRef.current;
-      
-      console.log('🚚 Updating rider location on map:', location);
-      
-      // Create or update rider marker
-      const riderIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [12, 41]
-      });
-      
-      // Remove previous routing if it exists
-      if (routingControlRef.current) {
-        routingControlRef.current.remove();
-        routingControlRef.current = null;
-      }
-
-      // Remove previous rider marker if exists
-      if (riderMarkerRef.current) {
-        map.removeLayer(riderMarkerRef.current);
-      }
-
-      // Create new rider marker
-      riderMarkerRef.current = L.marker([location.latitude, location.longitude], {
-        icon: riderIcon
-      }).addTo(map)
-      .bindPopup('Driver Location')
-      .openPopup();
-
-      // Create routing from rider to delivery location
-      if (L.Routing) {
-        try {
-          console.log('🧭 Creating route between rider and delivery location');
-          
-          routingControlRef.current = L.Routing.control({
-            waypoints: [
-              L.latLng(location.latitude, location.longitude),
-              L.latLng(deliveryLocation.latitude, deliveryLocation.longitude)
-            ],
-            routeWhileDragging: false,
-            showAlternatives: false,
-            fitSelectedRoutes: true,
-            lineOptions: {
-              styles: [{ color: '#6366F1', opacity: 0.7, weight: 6 }],
-              extendToWaypoints: true,
-              missingRouteTolerance: 0
-            },
-            createMarker: function() { return null; } // Don't create additional markers
-          }).addTo(map);
-          
-          console.log('✅ Route created successfully');
-        } catch (routingError) {
-          console.error("❌ Error creating routing:", routingError);
-          
-          // Fallback: just add a simple line if routing fails
-          try {
-            console.log('⚠️ Using fallback simple line route');
-            const line = L.polyline([
-              [location.latitude, location.longitude],
-              [deliveryLocation.latitude, deliveryLocation.longitude]
-            ], {
-              color: '#6366F1',
-              weight: 4,
-              opacity: 0.7,
-              dashArray: '10, 10',
-            }).addTo(map);
-            
-            routingControlRef.current = { 
-              remove: () => map.removeLayer(line) 
-            };
-          } catch (lineError) {
-            console.error("❌ Error creating fallback line:", lineError);
-          }
-        }
-      } else {
-        console.warn('⚠️ L.Routing not available - adding simple line instead');
-        
-        // Simple line fallback if routing isn't available
-        const line = L.polyline([
-          [location.latitude, location.longitude],
-          [deliveryLocation.latitude, deliveryLocation.longitude]
-        ], {
-          color: '#6366F1',
-          weight: 4,
-          opacity: 0.7,
-          dashArray: '10, 10',
-        }).addTo(map);
-        
-        routingControlRef.current = { 
-          remove: () => map.removeLayer(line) 
-        };
-      }
-
-      // Fit map bounds to include both points with padding
-      const bounds = L.latLngBounds(
-        L.latLng(location.latitude, location.longitude),
-        L.latLng(deliveryLocation.latitude, deliveryLocation.longitude)
-      );
-      map.fitBounds(bounds, { padding: [50, 50] });
-    } catch (error) {
-      console.error('❌ Error updating rider location:', error);
-    }
-  };
-
-  // Update when rider location changes
-  useEffect(() => {
-    if (!window.L || !mapInstanceRef.current) return;
-    
-    if (riderLocation) {
-      console.log('🔄 Rider location received, updating map:', riderLocation);
-      updateRiderLocation(riderLocation);
-    } else {
-      console.log('⚠️ No rider location data available yet');
-    }
-  }, [riderLocation]);
-
-  return (
-    <div
-      ref={mapRef}
-      style={{ height, width: '100%', borderRadius: '0.5rem' }}
-      className="bg-gray-100 dark:bg-gray-700"
-      data-testid="delivery-map"
-    />
-  );
+  return <div id={mapIdRef.current} style={{ height, width: '100%' }}></div>;
 };
-
-// Add global type definitions
-declare global {
-  interface Window {
-    L: any;
-  }
-}
 
 export default DeliveryMap;

@@ -82,14 +82,10 @@ const OrderDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-
-  const sseRef = useRef<EventSource | null>(null);
-
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [deliveryLocation, setDeliveryLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const socketRef = useRef<any>(null);
   const [socketConnected, setSocketConnected] = useState<boolean>(false);
-
   
   // Function to fetch order details
   const fetchOrderDetails = useCallback(async (orderId: string) => {
@@ -185,7 +181,7 @@ const OrderDetailPage: React.FC = () => {
     }
   }, [id, fetchOrderDetails]);
 
-
+  // Connect to socket for rider location tracking
   useEffect(() => {
     if (!id || !orderDetails || 
         (orderDetails.status !== 'picking-up' && orderDetails.status !== 'heading-your-way')) {
@@ -197,9 +193,6 @@ const OrderDetailPage: React.FC = () => {
       return;
     }
     
-
-    // No need to set up SSE anymore - don't try to set socketConnected from here
-
     // Extract MongoDB ID from the formatted ID if needed
     const rawOrderId = orderDetails._id || orderDetails.id;
     
@@ -234,7 +227,6 @@ const OrderDetailPage: React.FC = () => {
         orderId: rawOrderId
       });
     });
-
     
     // Listen for rider location updates
     trackingSocket.on('riderLocationUpdate', (data) => {
@@ -259,24 +251,6 @@ const OrderDetailPage: React.FC = () => {
           console.warn('⚠️ Received rider location update without valid coordinates');
         }
       }
-
-    };
-  }, [id]);
-  
-  // Set up socket and polling as primary methods
-  useEffect(() => {
-    let pollingInterval: NodeJS.Timeout | null = null;
-    
-    // Start polling if socket is disconnected
-    if (!socketConnected && id) {
-      // Poll every 10 seconds
-      pollingInterval = setInterval(() => {
-        fetchOrderDetails(id);
-      }, 10000);
-    }
-    
-    // Clean up interval on unmount or when socket reconnects
-
     });
     
     trackingSocket.on('connect_error', (error) => {
@@ -296,7 +270,6 @@ const OrderDetailPage: React.FC = () => {
     });
     
     // Cleanup on unmount or tab change
-
     return () => {
       if (trackingSocket) {
         console.log('🧹 Disconnecting tracking socket');
@@ -305,7 +278,6 @@ const OrderDetailPage: React.FC = () => {
         setSocketConnected(false);
       }
     };
-
   }, [id, orderDetails, activeTab]);
 
   // Initial order fetch
@@ -378,7 +350,6 @@ const OrderDetailPage: React.FC = () => {
     return colors[index];
   };
 
-
   // Add a function to manually reconnect the socket
   const reconnectTrackingSocket = useCallback(() => {
     if (socketRef.current) {
@@ -393,23 +364,18 @@ const OrderDetailPage: React.FC = () => {
   }, []);
 
   // Connection status indicator
-
   const ConnectionStatusIndicator = () => (
     <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-4">
       <div className="flex items-center">
         <div className="relative w-3 h-3 rounded-full mr-2 bg-gray-300">
-
           <div className={`absolute inset-0 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
           {socketConnected && (
             <span className="animate-ping absolute inset-0 rounded-full bg-green-400 opacity-75"></span>
-
           )}
         </div>
         <div>
           <p className="text-sm font-medium dark:text-white">
-
             {socketConnected ? 'Live Tracking Active' : 'Tracking Offline'}
-
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Last updated: {lastUpdated.toLocaleTimeString()}
@@ -419,9 +385,7 @@ const OrderDetailPage: React.FC = () => {
       <div className="flex items-center space-x-2">
         {!socketConnected && (
           <button 
-
             onClick={reconnectTrackingSocket}
-
             className="flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
           >
             <SignalIcon className="w-3 h-3 mr-1" />
@@ -592,9 +556,7 @@ const OrderDetailPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-
                     <span className="font-medium dark:text-white self-end sm:self-center">${(item.price * item.quantity).toFixed(2)}</span>
-
                   </div>
                 ))}
               </div>
@@ -605,19 +567,19 @@ const OrderDetailPage: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                  <span className="dark:text-white">Rs. {orderDetails.subtotal.toFixed(2)}</span>
+                  <span className="dark:text-white">${orderDetails.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Delivery Fee</span>
-                  <span className="dark:text-white">Rs. {orderDetails.deliveryFee.toFixed(2)}</span>
+                  <span className="dark:text-white">${orderDetails.deliveryFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Tax</span>
-                  <span className="dark:text-white">Rs. {orderDetails.tax.toFixed(2)}</span>
+                  <span className="dark:text-white">${orderDetails.tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-lg mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <span className="dark:text-white">Total</span>
-                  <span className="dark:text-white">Rs. {orderDetails.total.toFixed(2)}</span>
+                  <span className="dark:text-white">${orderDetails.total.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center mt-3 text-sm text-gray-600 dark:text-gray-400">
                   <CreditCardIcon className="h-4 w-4 mr-2" />

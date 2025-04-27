@@ -273,7 +273,7 @@ export default function OrdersScreen() {
   const handleAcceptOrder = async (orderId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.26.1:5003/api/deliveries/orders/${orderId}/status`, {
+      const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -303,6 +303,29 @@ export default function OrdersScreen() {
         )
       );
       
+      // Send notification to user about status change
+      try {
+        const order = ordersData.find(o => o._id === orderId);
+        if (order && order.user && order.user._id) {
+          await fetch('http://192.168.121.59:5005/api/notifications/senddirect', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userIds: [order.user._id],
+              title: 'Order Update',
+              message: `Your order from ${order.restaurant.name} is now being picked up by your driver.`,
+              channels: ['sms', 'in-app'] // As requested, SMS and in-app
+            })
+          });
+          console.log('Pickup notification sent to user');
+        }
+      } catch (notificationError) {
+        console.error('Failed to send pickup notification:', notificationError);
+        // Continue with order flow despite notification failure
+      }
+      
       // Emit rider acceptance event to socket
       if (socketInstance && user?._id) {
         socketInstance.emit('riderAcceptOrder', {
@@ -328,7 +351,7 @@ export default function OrdersScreen() {
     try {
       setLoading(true);
       const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -354,6 +377,29 @@ export default function OrdersScreen() {
         )
       );
 
+      // Send notification to user about status change
+      try {
+        const order = ordersData.find(o => o._id === orderId);
+        if (order && order.user && order.user._id) {
+          await fetch('http://192.168.121.59:5005/api/notifications/senddirect', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userIds: [order.user._id],
+              title: 'Order Update',
+              message: `Your order from ${order.restaurant.name} is on the way! Your driver has picked up your food.`,
+              channels: ['sms', 'in-app']
+            })
+          });
+          console.log('Heading your way notification sent to user');
+        }
+      } catch (notificationError) {
+        console.error('Failed to send heading your way notification:', notificationError);
+        // Continue with order flow despite notification failure
+      }
+
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
       setError(`Failed to pickup order: ${errorMessage}`);
@@ -371,7 +417,7 @@ export default function OrdersScreen() {
       stopSendingLocation(orderId);
       
       const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -390,6 +436,29 @@ export default function OrdersScreen() {
           order._id === orderId ? updatedOrder.data : order
         )
       );
+
+      // Send notification to user about status change
+      try {
+        const order = ordersData.find(o => o._id === orderId);
+        if (order && order.user && order.user._id) {
+          await fetch('http://192.168.121.59:5005/api/notifications/senddirect', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userIds: [order.user._id],
+              title: 'Order Delivered',
+              message: `Your order from ${order.restaurant.name} has been delivered! Enjoy your meal.`,
+              channels: ['sms', 'in-app']
+            })
+          });
+          console.log('Delivery completed notification sent to user');
+        }
+      } catch (notificationError) {
+        console.error('Failed to send delivery completed notification:', notificationError);
+        // Continue with order flow despite notification failure
+      }
 
       if (user?._id) {
         const order = ordersData.find(o => o._id === orderId);

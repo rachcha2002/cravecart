@@ -94,7 +94,7 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findOne({orderId:orderId});
+    const order = await Order.findById(orderId);
     
     if (!order) {
       return res.status(404).json({
