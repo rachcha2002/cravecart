@@ -93,6 +93,25 @@ exports.createOrder = async (req, res) => {
         orderData: savedOrder,
         message: 'New order received!'
       });
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to restaurant ${restaurantId} for new order ${savedOrder.orderId}`);
+      
+      // Send in-app notification to restaurant
+      const sendInAppNotification = req.app.get('sendInAppNotification');
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to restaurant: ${restaurantId}`);
+        const title = 'New Order Received';
+        const message = `New order #${savedOrder.orderId} has been received!`;
+        
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to restaurant ${restaurantId} for new order ${savedOrder.orderId}`);
+        sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][ORDER_CREATION] Restaurant notification sent for order ${savedOrder.orderId}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
+          });
+      }
     }
     
     res.status(201).json({
@@ -255,6 +274,7 @@ const sendNotifications = (req, order, status, description) => {
         'order-status-update', 
         createNotificationPayload(`Order ${orderId} status updated to `)
       );
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to restaurant ${restaurantId} for order ${orderId} status update: ${status}`);
       
       // Send in-app notification to restaurant
       if (sendInAppNotification) {
@@ -262,9 +282,11 @@ const sendNotifications = (req, order, status, description) => {
         const title = 'Order Status Update';
         const message = `Order #${orderId} status has been updated to ${formatStatus(status)}`;
         
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to restaurant ${restaurantId} for order ${orderId} status update: ${status}`);
         sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
           .then(result => {
             console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][STATUS_UPDATE] Restaurant notification sent for order ${orderId}, status: ${status}`);
           })
           .catch(err => {
             console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
@@ -280,10 +302,12 @@ const sendNotifications = (req, order, status, description) => {
       
       // Main namespace - customer-specific room
       io.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to customer ${customerId} for order ${orderId} status update: ${status}`);
       
       // Customer namespace - customer-specific room
       if (customerIo) {
         customerIo.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
+        console.log(`[NOTIFICATION_SENT] Customer namespace socket notification sent to customer ${customerId} for order ${orderId} status update: ${status}`);
       }
       
       // Send in-app notification to customer
@@ -292,9 +316,11 @@ const sendNotifications = (req, order, status, description) => {
         const title = 'Order Status Update';
         const message = `Your order #${orderId} status has been updated to ${formatStatus(status)}`;
         
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to customer ${customerId} for order ${orderId} status update: ${status}`);
         sendInAppNotification(customerId, title, message, 'CUSTOMER')
           .then(result => {
             console.log(`[NOTIFICATION] In-app notification to customer ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][STATUS_UPDATE] Customer notification sent for order ${orderId}, status: ${status}`);
           })
           .catch(err => {
             console.error(`[NOTIFICATION] Error sending customer notification:`, err.message);
@@ -305,10 +331,12 @@ const sendNotifications = (req, order, status, description) => {
     // 3. Broadcast to order-specific room
     console.log(`[NOTIFICATION] Broadcasting to order room: order-${orderId}`);
     io.to(`order-${orderId}`).emit('order-status-update', createNotificationPayload());
+    console.log(`[NOTIFICATION_SENT] Socket notification broadcasted to order room: order-${orderId} for status update: ${status}`);
     
     // 4. Emit to customer namespace order-specific room
     if (customerIo) {
       customerIo.to(`order-${orderId}`).emit('order-status-update', createNotificationPayload());
+      console.log(`[NOTIFICATION_SENT] Customer namespace socket notification sent to order room: order-${orderId} for status update: ${status}`);
     }
     
     return true;
@@ -410,6 +438,25 @@ exports.updatePaymentStatus = async (req, res) => {
         orderData: order,
         message: 'New order received with completed payment!'
       });
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to restaurant ${restaurantId} for payment completed on order ${order.orderId}`);
+      
+      // Send in-app notification to restaurant
+      const sendInAppNotification = req.app.get('sendInAppNotification');
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to restaurant: ${restaurantId}`);
+        const title = 'New Order Received';
+        const message = `New order #${order.orderId} payment has been completed!`;
+        
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to restaurant ${restaurantId} for payment completed on order ${order.orderId}`);
+        sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][PAYMENT_COMPLETED] Restaurant notification sent for order ${order.orderId}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
+          });
+      }
     }
     
     // Save the updated order
