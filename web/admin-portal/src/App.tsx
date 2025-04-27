@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import AdminUsers from "./pages/AdminUsers";
 import Orders from "./pages/Orders";
+import RestaurantDetails from "./pages/Restaurants";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import Layout from "./components/Layout";
@@ -31,6 +32,7 @@ const App = () => {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/users" element={<AdminUsers />} />
                 <Route path="/orders" element={<Orders />} />
+                <Route path="/restaurants" element={<RestaurantDetails />} />
                 <Route
                   path="/"
                   element={<Navigate to="/dashboard" replace />}

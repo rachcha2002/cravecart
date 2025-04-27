@@ -195,7 +195,7 @@ io.on('connection', (socket) => {
 
 // Enhanced middleware setup with security and performance headers
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: false // Change to false for simple cross-origin requests without credentials
 }));
