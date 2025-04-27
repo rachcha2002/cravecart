@@ -3,11 +3,23 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
+// Base API URL configuration
+export const BASE_API_URL = "http://192.168.121.59"; // Centralized server URL
+
+// API URLs for different services
+export const API_URLS = {
+  AUTH_SERVICE: `${BASE_API_URL}:3001/api`,
+  ORDER_SERVICE: `${BASE_API_URL}:5003/api/deliveries`,
+  DELIVERY_SERVICE: `${BASE_API_URL}:3005/api/deliveries`,
+  NOTIFICATION_SERVICE: `${BASE_API_URL}:5005/api/notifications`,
+  SOCKET_SERVICE: `${BASE_API_URL}:3005`
+};
+
 // Choose the right URL based on where the app is running
 const getApiUrl = () => {
   if (Platform.OS === "android") {
-    // For Android emulator - this special IP points to host machine's localhost
-    return "http://192.168.121.59:3001/api";
+    // For Android emulator - use the configured IP
+    return API_URLS.AUTH_SERVICE;
   } else if (Platform.OS === "ios") {
     // For iOS simulator
     return "http://localhost:3001/api";
