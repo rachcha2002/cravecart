@@ -12,11 +12,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
 import { useRouter } from "expo-router";
+import { NotificationBellIcon } from "../../src/components/NotificationBellIcon";
+import { useNotifications } from "../../src/context/NotificationsContext";
 
 export default function Dashboard() {
   const [isOnline, setIsOnline] = useState(true);
   const { user, updateProfile } = useAuth();
   const router = useRouter();
+  const { notification, unreadCount } = useNotifications();
 
   const stats = {
     deliveries: 12,
@@ -53,6 +56,11 @@ export default function Dashboard() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {notification && (
+        <View style={styles.notificationBadge}>
+          <Text style={styles.notificationText}>New notification!</Text>
+        </View>
+      )}
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
@@ -62,12 +70,15 @@ export default function Dashboard() {
             </Text>
             <Text style={styles.headerSubtitle}>Ready for deliveries?</Text>
           </View>
-          <TouchableOpacity
-            style={styles.profileImageContainer}
-            onPress={() => router.push("/profile")}
-          >
-            <Image source={profileImageSource} style={styles.profileImage} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <NotificationBellIcon count={unreadCount} />
+            <TouchableOpacity
+              style={styles.profileImageContainer}
+              onPress={() => router.push("/profile")}
+            >
+              <Image source={profileImageSource} style={styles.profileImage} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Status Card */}
@@ -267,5 +278,25 @@ const styles = StyleSheet.create({
   statsLabel: {
     color: "#6b7280",
     marginTop: 4,
+  },
+  notificationBadge: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    backgroundColor: "#f29f05",
+    padding: 10,
+    alignItems: "center",
+    borderRadius: 5,
+    margin: 10,
+  },
+  notificationText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 });

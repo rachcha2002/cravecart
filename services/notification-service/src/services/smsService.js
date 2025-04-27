@@ -2,7 +2,7 @@
 const axios = require("axios");
 const winston = require("winston");
 
-// Minimal logger configuration - you can reuse your existing logger instead
+// Minimal logger configuration
 const logger = winston.createLogger({
   level: "error",
   format: winston.format.json(),
