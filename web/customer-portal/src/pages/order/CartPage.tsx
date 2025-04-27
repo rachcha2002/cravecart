@@ -60,7 +60,9 @@ const CartPage: React.FC = () => {
     const fetchRestaurantLocation = async () => {
       if (restaurantId) {
         try {
-          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/restaurants/${restaurantId}`);
+          const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+          const response = await fetch(`${baseUrl}/api/restaurants/${restaurantId}`);
+
           const data = await response.json();
           
           if (response.ok && data.success) {

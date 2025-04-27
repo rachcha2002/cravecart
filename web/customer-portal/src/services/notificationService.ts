@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Fix the API URL to ensure we're using the correct format
 // The error suggests the URL format might be wrong
-const NOTIFICATION_API_URL = process.env.REACT_APP_NOTIFICATION_API_URL || 'http://localhost:5005/api';
+const NOTIFICATION_API_URL = `${process.env.REACT_APP_NOTIFICATION_API_URL}/api` || 'http://localhost:5005/api';
 
 const notificationApi = axios.create({
   baseURL: NOTIFICATION_API_URL,
