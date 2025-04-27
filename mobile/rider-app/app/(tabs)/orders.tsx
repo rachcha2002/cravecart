@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Linking,
-  Platform,
-  ActivityIndicator,
+import {View,Text,StyleSheet,ScrollView,TouchableOpacity,SafeAreaView,Linking,Platform,ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import * as Location from 'expo-location';
+import io from 'socket.io-client';
 
 interface Restaurant {
   _id: string;
@@ -98,6 +90,13 @@ interface DeliveryHistory {
   earnMoney: number
 }
 
+// Add an interface for the location received response
+interface LocationReceivedResponse {
+  success: boolean;
+  timestamp: string;
+  orderId: string;
+}
+
 export default function OrdersScreen() {
   const [ordersData, setOrdersData] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,9 +105,42 @@ export default function OrdersScreen() {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orderTimes, setOrderTimes] = useState<{[orderId: string]: {acceptTime?: Date, pickupTime?: Date}}>({});
   const [deliveryHistory, setDeliveryHistory] = useState<DeliveryHistory[]>([]);
+  const [locationTrackingActive, setLocationTrackingActive] = useState<{[orderId: string]: boolean}>({});
+  const [socketInstance, setSocketInstance] = useState<any>(null);
   
   const auth = useAuth();
   const user = auth.user;
+
+  // Initialize socket connection
+  useEffect(() => {
+    // Create socket connection
+    // ISSUE: Socket URL might be incorrect - currently using port 5005 instead of 3005
+    const socket = io('http://192.168.121.59:3005'); // FIXED: Changed from 5005 to 3005
+    setSocketInstance(socket);
+
+    // Socket event handlers
+    socket.on('connect', () => {
+      console.log('Socket connected:', socket.id);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Clean up on unmount
+    return () => {
+      if (socket) {
+        // Stop all active location tracking
+        Object.keys(locationTrackingActive).forEach(orderId => {
+          if (locationTrackingActive[orderId]) {
+            stopSendingLocation(orderId);
+          }
+        });
+        socket.disconnect();
+        console.log('Socket disconnected');
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchNearbyOrders = async () => {
@@ -267,6 +299,18 @@ export default function OrdersScreen() {
           order._id === orderId ? updatedOrder.data : order
         )
       );
+      
+      // Emit rider acceptance event to socket
+      if (socketInstance && user?._id) {
+        socketInstance.emit('riderAcceptOrder', {
+          orderId,
+          riderId: user._id,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Start sending location updates
+        startSendingLocation(orderId);
+      }
 
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
@@ -319,6 +363,10 @@ export default function OrdersScreen() {
   const handleCompleteOrder = async (orderId: string) => {
     try {
       setLoading(true);
+      
+      // Stop sending location updates for this order
+      stopSendingLocation(orderId);
+      
       const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
@@ -411,6 +459,92 @@ export default function OrdersScreen() {
       console.error('Error completing order:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Start sending location updates
+  const startSendingLocation = async (orderId: string) => {
+    if (!socketInstance || !user?._id) return;
+    
+    try {
+      // Request permission if not already granted
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('Permission to access location was denied');
+        return;
+      }
+      
+      // Create an interval ID for this order
+      const intervalId = setInterval(async () => {
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High
+          });
+          
+          if (location && socketInstance) {
+            // Ensure socket is still connected
+            if (!socketInstance.connected) {
+              console.log('Socket disconnected, attempting to reconnect...');
+              socketInstance.connect();
+            }
+            
+            // Emit location to socket server with the correct event name and structure
+            socketInstance.emit('riderLocation', {
+              orderId,
+              riderId: user._id,
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              timestamp: new Date().toISOString()
+            });
+            
+            console.log(`Location sent for order ${orderId}:`, {
+              lat: location.coords.latitude,
+              lng: location.coords.longitude
+            });
+            
+            // Add a confirmation event listener with proper typing
+            socketInstance.once('locationReceived', (data: LocationReceivedResponse) => {
+              console.log('Server confirmed location receipt:', data);
+            });
+          }
+        } catch (err) {
+          console.error('Error getting or sending location:', err);
+        }
+      }, 10000); // Update every 10 seconds
+      
+      // Store the interval ID in state with the order ID
+      setLocationTrackingActive(prev => ({
+        ...prev,
+        [orderId]: true
+      }));
+      
+      // Store the interval ID as a property on the component
+      // This is a bit of a hack but works for cleanup
+      // @ts-ignore
+      window[`locationInterval_${orderId}`] = intervalId;
+      
+      console.log(`Started location tracking for order ${orderId}`);
+    } catch (err) {
+      console.error('Failed to start location tracking:', err);
+    }
+  };
+  
+  // Stop sending location updates
+  const stopSendingLocation = (orderId: string) => {
+    // @ts-ignore
+    const intervalId = window[`locationInterval_${orderId}`];
+    
+    if (intervalId) {
+      clearInterval(intervalId);
+      // @ts-ignore
+      delete window[`locationInterval_${orderId}`];
+      
+      setLocationTrackingActive(prev => ({
+        ...prev,
+        [orderId]: false
+      }));
+      
+      console.log(`Stopped location tracking for order ${orderId}`);
     }
   };
 
