@@ -4,15 +4,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 // Base API URL configuration
-export const BASE_API_URL = "http://192.168.121.59"; // Centralized server URL
+export const BASE_API_URL =`${process.env.EXPO_PUBLIC_BASE_URL}` ||"http://192.168.121.59"; // Centralized server URL
 
 // API URLs for different services
 export const API_URLS = {
-  AUTH_SERVICE: `${BASE_API_URL}:3001/api`,
-  ORDER_SERVICE: `${BASE_API_URL}:5003/api/deliveries`,
-  DELIVERY_SERVICE: `${BASE_API_URL}:3005/api/deliveries`,
-  NOTIFICATION_SERVICE: `${BASE_API_URL}:5005/api/notifications`,
-  SOCKET_SERVICE: `${BASE_API_URL}:3005`
+  AUTH_SERVICE: `${process.env.EXPO_PUBLIC_AUTH_SERVICEL}`,
+  ORDER_SERVICE: `${process.env.EXPO_PUBLIC_ORDER_SERVICE}`,
+  DELIVERY_SERVICE: `${process.env.EXPO_PUBLIC_DELIVERY_SERVICE}`,
+  NOTIFICATION_SERVICE: `${process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE}`,
+  SOCKET_SERVICE: `${process.env.EXPO_PUBLIC_SOCKET_SERVICE}`
 };
 
 // Choose the right URL based on where the app is running
