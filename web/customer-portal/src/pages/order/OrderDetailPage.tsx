@@ -640,7 +640,7 @@ const OrderDetailPage: React.FC = () => {
                       </div>
                     </div>
                     <span className="font-medium dark:text-white self-end sm:self-center">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      LKR (Rs.) {(item.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
@@ -657,7 +657,7 @@ const OrderDetailPage: React.FC = () => {
                     Subtotal
                   </span>
                   <span className="dark:text-white">
-                    ${orderDetails.subtotal.toFixed(2)}
+                    LKR (Rs.) {orderDetails.subtotal.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -665,19 +665,19 @@ const OrderDetailPage: React.FC = () => {
                     Delivery Fee
                   </span>
                   <span className="dark:text-white">
-                    ${orderDetails.deliveryFee.toFixed(2)}
+                    LKR (Rs.) {orderDetails.deliveryFee.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Tax</span>
                   <span className="dark:text-white">
-                    ${orderDetails.tax.toFixed(2)}
+                    LKR (Rs.) {orderDetails.tax.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between font-semibold text-lg mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <span className="dark:text-white">Total</span>
                   <span className="dark:text-white">
-                    ${orderDetails.total.toFixed(2)}
+                    LKR (Rs.) {orderDetails.total.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex items-center mt-3 text-sm text-gray-600 dark:text-gray-400">

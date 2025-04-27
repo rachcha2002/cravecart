@@ -262,21 +262,23 @@ server.listen(PORT, () => {
 });
 
 // Connect to MongoDB with optimized settings
+// Connect to MongoDB with optimized settings
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 10000,
     });
-    console.log('MongoDB connected successfully');
+    console.log(`MongoDB connected successfully to database: ${conn.connection.name}`);
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
   }
 };
+
 
 connectDB();
 
