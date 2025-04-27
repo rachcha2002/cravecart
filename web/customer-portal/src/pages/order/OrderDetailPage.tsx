@@ -25,7 +25,8 @@ const DeliveryMap = lazy(() => import('../../components/map/DeliveryMap'));
 const MapFallback = lazy(() => import('../../components/map/MapFallback'));
 
 // Add the API_URL constant to use the correct socket endpoint
-const API_URL ='http://localhost:3005';
+const API_URL =`${process.env.REACT_APP_DELIVERY_API_URL}`||'http://localhost:3005';
+
 
 interface OrderItem {
   name: string;
