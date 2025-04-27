@@ -457,6 +457,36 @@ exports.updatePaymentStatus = async (req, res) => {
             console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
           });
       }
+
+      // Send SMS to customer
+      if (order.user && order.user._id) {
+        try {
+          console.log(`[SMS_NOTIFICATION] Sending SMS to customer: ${order.user._id}`);
+          const axios = require('axios');
+          const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:5005';
+          
+          // Prepare notification data
+          const notificationData = {
+            userIds: [order.user._id],
+            title: 'Payment Successful',
+            message: `Your payment for order #${order.orderId} has been completed successfully. Thank you for your order!`,
+            channels: ['SMS'], // Specify SMS as the channel
+            
+          };
+          
+          // Make a POST request to the notification service
+          axios.post(`${notificationServiceUrl}/api/notifications/senddirect`, notificationData)
+            .then(response => {
+              console.log(`[SMS_NOTIFICATION] SMS notification sent successfully to customer ${order.user._id}`);
+              console.log(`[NOTIFICATION][PAYMENT_COMPLETED] Customer SMS notification sent for order ${order.orderId}`);
+            })
+            .catch(error => {
+              console.error(`[SMS_NOTIFICATION] Error sending SMS notification:`, error.message);
+            });
+        } catch (smsError) {
+          console.error(`[SMS_NOTIFICATION] Error preparing SMS notification:`, smsError.message);
+        }
+      }
     }
     
     // Save the updated order
