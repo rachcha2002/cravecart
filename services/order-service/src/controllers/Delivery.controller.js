@@ -63,7 +63,7 @@ const findNearbyWrappingOrders = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { status } = req.body;
+    const { status,driver } = req.body;
     
     if (!orderId) {
       return res.status(400).json({
@@ -104,6 +104,7 @@ const updateOrderStatus = async (req, res) => {
     }
 
     order.status = status;
+    order.driver = driver;
     
     order.deliveryTimeline.push({
       status,

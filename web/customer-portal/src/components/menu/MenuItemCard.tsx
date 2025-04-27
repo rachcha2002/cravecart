@@ -48,7 +48,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, restaurantId, restaur
       <div className={`p-4 ${item.imageUrl ? 'w-2/3' : 'w-full'}`}>
         <div className="flex justify-between items-start">
           <h4 className="font-medium text-lg">{item.name}</h4>
-          <span className="font-semibold">${item.price.toFixed(2)}</span>
+          <span className="font-semibold">Rs. {item.price.toFixed(2)}</span>
         </div>
         <p className="text-gray-600 text-sm mt-1">{item.description}</p>
         

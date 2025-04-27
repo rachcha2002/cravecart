@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authApi } from "../api/authApi";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { useNotifications } from "./NotificationsContext";
 type User = {
   _id: string;
   name: string;
@@ -70,6 +71,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [initializing, setInitializing] = useState(true);
   const router = useRouter();
 
+  const notificationsContext = useNotifications();
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
+
   // Check if user is already logged in on app startup
   useEffect(() => {
     const loadUser = async () => {
@@ -125,10 +129,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = async (callback?: () => void) => {
     setLoading(true);
     try {
+      // Use the context from the component scope
+      if (notificationsContext?.expoPushToken) {
+        try {
+          await authApi.removeDeviceToken(notificationsContext.expoPushToken);
+        } catch (error) {
+          console.error("Failed to remove device token:", error);
+        }
+      }
+      // Or if managing token directly
+      if (deviceToken) {
+        try {
+          await authApi.removeDeviceToken(deviceToken);
+        } catch (error) {
+          console.error("Failed to remove device token:", error);
+        }
+      }
+
       await authApi.logout();
       setUser(null);
 
-      // Execute callback if provided (for navigation)
       if (callback) {
         callback();
       }

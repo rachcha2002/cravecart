@@ -84,12 +84,34 @@ exports.createOrder = async (req, res) => {
     if (savedOrder.paymentStatus === 'completed') {
       const restaurantId = savedOrder.restaurant._id;
       
+      console.log(`[NOTIFICATION] New order ${savedOrder.orderId} with completed payment`);
+      console.log(`[NOTIFICATION] Sending socket notification to restaurant: ${restaurantId}`);
+      
       // Emit to specific restaurant room
       io.to(`restaurant-${restaurantId}`).emit('new-order', {
         orderId: savedOrder.orderId,
         orderData: savedOrder,
         message: 'New order received!'
       });
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to restaurant ${restaurantId} for new order ${savedOrder.orderId}`);
+      
+      // Send in-app notification to restaurant
+      const sendInAppNotification = req.app.get('sendInAppNotification');
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to restaurant: ${restaurantId}`);
+        const title = 'New Order Received';
+        const message = `New order #${savedOrder.orderId} has been received!`;
+        
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to restaurant ${restaurantId} for new order ${savedOrder.orderId}`);
+        sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][ORDER_CREATION] Restaurant notification sent for order ${savedOrder.orderId}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
+          });
+      }
     }
     
     res.status(201).json({
@@ -171,35 +193,10 @@ exports.getOrderById = async (req, res) => {
 
 // Get real-time order updates
 exports.getOrderUpdates = async (req, res) => {
+  // Remove SSE implementation and return a REST API response instead
   const { orderId } = req.params;
-  const { token } = req.query;
-  
-  // Validate authentication token
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Authentication token is required for SSE connections'
-    });
-  }
   
   try {
-    // Validate JWT token (simplified, you should implement proper token validation)
-    let userId;
-    try {
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) throw new Error('Invalid token format');
-      
-      const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
-      userId = payload.id || payload._id;
-      
-      if (!userId) throw new Error('User ID not found in token');
-    } catch (tokenError) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid authentication token'
-      });
-    }
-    
     // Find the order
     const order = await Order.findOne({ orderId }).lean();
     
@@ -210,84 +207,24 @@ exports.getOrderUpdates = async (req, res) => {
       });
     }
     
-    // Optional: Verify that the user has access to this order
-    const orderUserId = order.user?.id || order.user?._id;
-    const isRestaurantOrder = order.restaurant?._id;
-    
-    // Skip access check for now, but you can uncomment and customize this
-    // if (orderUserId !== userId && !isAdmin) {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'You do not have permission to access this order'
-    //   });
-    // }
-    
-    // Set headers for SSE
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    });
-    
-    // Initial heartbeat
-    res.write('data: {"type":"connected","message":"SSE connection established"}\n\n');
-    
-    // Store client info in app-wide sse-clients object
-    const clientId = req.socket.remoteAddress + '-' + Date.now();
-    const clients = req.app.get('sse-clients') || {};
-    
-    // Initialize clients object for this order if it doesn't exist
-    if (!clients[orderId]) {
-      clients[orderId] = {};
-    }
-    
-    // Store client response object
-    clients[orderId][clientId] = res;
-    
-    // Store the client collection back to app
-    req.app.set('sse-clients', clients);
-    
-    // Handle client disconnect
-    req.on('close', () => {
-      if (clients[orderId]) {
-        delete clients[orderId][clientId];
-        
-        // Clean up empty order entries
-        if (Object.keys(clients[orderId]).length === 0) {
-          delete clients[orderId];
-        }
-      }
-    });
-    
-    // Catch any errors in the SSE stream
-    res.on('error', (error) => {
-      console.error('Error in order updates stream:', error);
-      
-      // Try to close the connection
-      try {
-        delete clients[orderId][clientId];
-        res.end();
-      } catch (endError) {
-        console.error('Error ending SSE stream:', endError);
+    // Return current order status as a normal REST response
+    return res.status(200).json({
+      success: true,
+      message: 'Order status retrieved successfully',
+      data: {
+        orderId: order.orderId,
+        status: order.status,
+        formattedStatus: formatStatus(order.status),
+        lastUpdated: new Date().toISOString(),
+        orderData: order
       }
     });
   } catch (error) {
-    console.error('Error in order updates stream:', error);
-    
-    // If headers are not sent yet, send error response
-    if (!res.headersSent) {
-      return res.status(500).json({
-        success: false,
-        message: 'Server error while setting up order updates stream'
-      });
-    }
-    
-    // If headers are already sent, try to close the connection properly
-    try {
-      res.end();
-    } catch (endError) {
-      console.error('Error ending SSE stream:', endError);
-    }
+    console.error('Error fetching order updates:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while getting order updates'
+    });
   }
 };
 
@@ -301,29 +238,17 @@ const formatStatus = (status) => {
 
 // Helper function to send update to all connected clients for a specific order
 const sendOrderUpdate = (req, orderId, data) => {
-  const clients = req.app.get('sse-clients') || {};
-  if (!clients[orderId]) return;
-  
-  // Add timestamp to the data
-  const updateData = {
-    ...data,
-    timestamp: new Date().toISOString()
-  };
-  
-  // Send to all connected clients for this order
-  Object.values(clients[orderId]).forEach(client => {
-    try {
-      client.write(`data: ${JSON.stringify(updateData)}\n\n`);
-    } catch (error) {
-      console.error(`Error sending SSE update to client for order ${orderId}:`, error);
-      // We don't throw or exit here to prevent one client error from affecting others
-    }
-  });
+  // Remove SSE update functionality, use only Socket.IO
+  // Socket.IO notifications will be handled in the helper function below
 };
 
 // Helper function to create and send notifications
 const sendNotifications = (req, order, status, description) => {
   try {
+    console.log(`[NOTIFICATION] Processing status update notification for order ${order.orderId}`);
+    console.log(`[NOTIFICATION] Status: ${status}`);
+    console.log(`[NOTIFICATION] Description: ${description || 'N/A'}`);
+    
     const io = req.app.get('io');
     const customerIo = req.app.get('customerIo');
     const orderId = order.orderId;
@@ -338,49 +263,86 @@ const sendNotifications = (req, order, status, description) => {
       timestamp: new Date().toISOString()
     });
     
-    // 1. Send update to all connected SSE clients for this order
-    sendOrderUpdate(
-      req, 
-      orderId, 
-      createNotificationPayload('Your order status has been updated to ')
-    );
+    // Get the sendInAppNotification function
+    const sendInAppNotification = req.app.get('sendInAppNotification');
     
-    // 2. Emit status update event to restaurant
+    // 1. Emit status update event to restaurant & send in-app notification
     const restaurantId = order.restaurant?._id;
     if (restaurantId) {
+      console.log(`[NOTIFICATION] Sending socket notification to restaurant: ${restaurantId}`);
       io.to(`restaurant-${restaurantId}`).emit(
         'order-status-update', 
         createNotificationPayload(`Order ${orderId} status updated to `)
       );
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to restaurant ${restaurantId} for order ${orderId} status update: ${status}`);
+      
+      // Send in-app notification to restaurant
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to restaurant: ${restaurantId}`);
+        const title = 'Order Status Update';
+        const message = `Order #${orderId} status has been updated to ${formatStatus(status)}`;
+        
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to restaurant ${restaurantId} for order ${orderId} status update: ${status}`);
+        sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][STATUS_UPDATE] Restaurant notification sent for order ${orderId}, status: ${status}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
+          });
+      }
     }
     
-    // 3. Emit to customer if user data exists
+    // 2. Emit to customer if user data exists & send in-app notification
     const customerId = order.user?._id || order.user?.id;
     if (customerId) {
+      console.log(`[NOTIFICATION] Sending socket notification to customer: ${customerId}`);
       const customerPayload = createNotificationPayload('Your order status has been updated to ');
       
       // Main namespace - customer-specific room
       io.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to customer ${customerId} for order ${orderId} status update: ${status}`);
       
       // Customer namespace - customer-specific room
       if (customerIo) {
         customerIo.to(`customer-${customerId}`).emit('order-status-update', customerPayload);
+        console.log(`[NOTIFICATION_SENT] Customer namespace socket notification sent to customer ${customerId} for order ${orderId} status update: ${status}`);
+      }
+      
+      // Send in-app notification to customer
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to customer: ${customerId}`);
+        const title = 'Order Status Update';
+        const message = `Your order #${orderId} status has been updated to ${formatStatus(status)}`;
+        
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to customer ${customerId} for order ${orderId} status update: ${status}`);
+        sendInAppNotification(customerId, title, message, 'CUSTOMER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to customer ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][STATUS_UPDATE] Customer notification sent for order ${orderId}, status: ${status}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending customer notification:`, err.message);
+          });
       }
     }
+   
+    // 3. Broadcast to order-specific room
+    console.log(`[NOTIFICATION] Broadcasting to order room: order-${orderId}`);
+    io.to(`order-${orderId}`).emit('order-status-update', createNotificationPayload());
+    console.log(`[NOTIFICATION_SENT] Socket notification broadcasted to order room: order-${orderId} for status update: ${status}`);
     
-    // 4. Always emit to order-specific room as a fallback
-    const orderRoomPayload = createNotificationPayload(
-      customerId ? 'Your order status has been updated to ' : 'Order status has been updated to '
-    );
-    
-    io.to(`order-${orderId}`).emit('order-status-update', orderRoomPayload);
-    
+    // 4. Emit to customer namespace order-specific room
     if (customerIo) {
-      customerIo.to(`order-${orderId}`).emit('order-status-update', orderRoomPayload);
+      customerIo.to(`order-${orderId}`).emit('order-status-update', createNotificationPayload());
+      console.log(`[NOTIFICATION_SENT] Customer namespace socket notification sent to order room: order-${orderId} for status update: ${status}`);
     }
+    
+    return true;
   } catch (error) {
-    // Log error but don't fail the entire operation if notifications fail
-    console.error('Error sending order notifications:', error);
+    console.error('[NOTIFICATION] ERROR: Error sending notifications:', error.message);
+    return false;
   }
 };
 
@@ -476,6 +438,55 @@ exports.updatePaymentStatus = async (req, res) => {
         orderData: order,
         message: 'New order received with completed payment!'
       });
+      console.log(`[NOTIFICATION_SENT] Socket notification sent to restaurant ${restaurantId} for payment completed on order ${order.orderId}`);
+      
+      // Send in-app notification to restaurant
+      const sendInAppNotification = req.app.get('sendInAppNotification');
+      if (sendInAppNotification) {
+        console.log(`[NOTIFICATION] Sending in-app notification to restaurant: ${restaurantId}`);
+        const title = 'New Order Received';
+        const message = `New order #${order.orderId} payment has been completed!`;
+        
+        console.log(`[NOTIFICATION_SENT] In-app notification being sent to restaurant ${restaurantId} for payment completed on order ${order.orderId}`);
+        sendInAppNotification(restaurantId, title, message, 'RESTAURANT_OWNER')
+          .then(result => {
+            console.log(`[NOTIFICATION] In-app notification to restaurant ${result ? 'succeeded' : 'failed'}`);
+            console.log(`[NOTIFICATION][PAYMENT_COMPLETED] Restaurant notification sent for order ${order.orderId}`);
+          })
+          .catch(err => {
+            console.error(`[NOTIFICATION] Error sending restaurant notification:`, err.message);
+          });
+      }
+
+      // Send SMS to customer
+      if (order.user && order.user._id) {
+        try {
+          console.log(`[SMS_NOTIFICATION] Sending SMS to customer: ${order.user._id}`);
+          const axios = require('axios');
+          const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:5005';
+          
+          // Prepare notification data
+          const notificationData = {
+            userIds: [order.user._id],
+            title: 'Payment Successful',
+            message: `Your payment for order #${order.orderId} has been completed successfully. Thank you for your order!`,
+            channels: ['SMS'], // Specify SMS as the channel
+            
+          };
+          
+          // Make a POST request to the notification service
+          axios.post(`${notificationServiceUrl}/api/notifications/senddirect`, notificationData)
+            .then(response => {
+              console.log(`[SMS_NOTIFICATION] SMS notification sent successfully to customer ${order.user._id}`);
+              console.log(`[NOTIFICATION][PAYMENT_COMPLETED] Customer SMS notification sent for order ${order.orderId}`);
+            })
+            .catch(error => {
+              console.error(`[SMS_NOTIFICATION] Error sending SMS notification:`, error.message);
+            });
+        } catch (smsError) {
+          console.error(`[SMS_NOTIFICATION] Error preparing SMS notification:`, smsError.message);
+        }
+      }
     }
     
     // Save the updated order

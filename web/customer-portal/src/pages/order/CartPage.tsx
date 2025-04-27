@@ -50,11 +50,8 @@ const CartPage: React.FC = () => {
   const [restaurantLocation, setRestaurantLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [deliveryDistanceKM, setDeliveryDistanceKM] = useState(3.0); // Default distance
   
-  // Default price calculation parameters
-  const baseDeliveryFee = 2.99;
-  const deliveryPerKmRate = 0.5;
+  // Default commission and service fee rates
   const restaurantCommissionRate = 15;
-  const serviceFeeRate = 5;
 
   const navigate = useNavigate();
 
@@ -95,15 +92,12 @@ const CartPage: React.FC = () => {
       const prices = calculateOrderPrices({
         foodSubtotal,
         deliveryDistanceKM,
-        baseDeliveryFee,
-        deliveryPerKmRate,
-        restaurantCommissionRate,
-        serviceFeeRate
+        restaurantCommissionRate
       });
       
       setPriceBreakdown(prices);
     }
-  }, [foodSubtotal, deliveryDistanceKM, baseDeliveryFee, deliveryPerKmRate, restaurantCommissionRate, serviceFeeRate]);
+  }, [foodSubtotal, deliveryDistanceKM, restaurantCommissionRate]);
 
   // Handle quantity update
   const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
@@ -155,10 +149,10 @@ const CartPage: React.FC = () => {
                         <div>
                           <div className="flex justify-between text-base font-medium text-gray-900 dark:text-white">
                             <h3>{item.name}</h3>
-                            <p className="ml-4">${(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
+                            <p className="ml-4">Rs. {(item.price * (item.quantity ?? 1)).toFixed(2)}</p>
                           </div>
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            ${item.price.toFixed(2)} each
+                            Rs. {item.price.toFixed(2)} each
                           </p>
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             {item.restaurantName}
@@ -204,56 +198,56 @@ const CartPage: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-300">Subtotal</span>
-                  <span className="font-medium dark:text-white">${formatCurrency(foodSubtotal)}</span>
+                  <span className="font-medium dark:text-white">{formatCurrency(foodSubtotal)}</span>
                 </div>
                 
                 {priceBreakdown && (
                   <>
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">Base Delivery Fee</span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.baseDeliveryFee)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.baseDeliveryFee)}</span>
                     </div>
                     
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">
                         Distance Fee ({deliveryDistanceKM.toFixed(1)} km)
                       </span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.extraDistanceFee)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.extraDistanceFee)}</span>
                     </div>
                     
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">Total Delivery Fee</span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.totalDeliveryFee)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.totalDeliveryFee)}</span>
                     </div>
 
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">
-                        Service Fee ({serviceFeeRate}%)
+                        Service Fee (2%)
                       </span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.serviceFee)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.serviceFee)}</span>
                     </div>
 
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">
                         Restaurant Commission ({restaurantCommissionRate}%)
                       </span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.restaurantCommission)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.restaurantCommission)}</span>
                     </div>
                     
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-300">Tax</span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.tax)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.tax)}</span>
                 </div>
                     
                 <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-300">Driver Earnings</span>
-                      <span className="font-medium dark:text-white">${formatCurrency(priceBreakdown.driverEarnings)}</span>
+                      <span className="font-medium dark:text-white">{formatCurrency(priceBreakdown.driverEarnings)}</span>
                 </div>
                     
                 <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex justify-between">
                     <span className="font-semibold dark:text-white">Total</span>
-                        <span className="font-semibold dark:text-white">${formatCurrency(priceBreakdown.total)}</span>
+                        <span className="font-semibold dark:text-white">{formatCurrency(priceBreakdown.total)}</span>
                       </div>
                     </div>
                   </>
@@ -264,16 +258,16 @@ const CartPage: React.FC = () => {
                 <h3 className="font-medium mb-2 dark:text-white">Price Calculation Parameters:</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="text-gray-600 dark:text-gray-300">Base Fee:</div>
-                  <div className="text-right dark:text-white">${baseDeliveryFee.toFixed(2)}</div>
+                  <div className="text-right dark:text-white">Rs. {priceBreakdown?.baseDeliveryFee?.toFixed(2) || '150.00'}</div>
                   
                   <div className="text-gray-600 dark:text-gray-300">Per KM Rate:</div>
-                  <div className="text-right dark:text-white">${deliveryPerKmRate.toFixed(2)}/km</div>
+                  <div className="text-right dark:text-white">Rs. {priceBreakdown?.deliveryPerKmRate?.toFixed(2) || '75.00'}/km</div>
                   
                   <div className="text-gray-600 dark:text-gray-300">Free Threshold:</div>
-                  <div className="text-right dark:text-white">3.0 km</div>
+                  <div className="text-right dark:text-white">1.0 km</div>
                   
                   <div className="text-gray-600 dark:text-gray-300">Service Fee Rate:</div>
-                  <div className="text-right dark:text-white">{serviceFeeRate}%</div>
+                  <div className="text-right dark:text-white">2%</div>
                   
                   <div className="text-gray-600 dark:text-gray-300">Commission Rate:</div>
                   <div className="text-right dark:text-white">{restaurantCommissionRate}%</div>
@@ -295,11 +289,11 @@ const CartPage: React.FC = () => {
                       priceBreakdown,
                       // Add calculation parameters
                       calculationParams: {
-                        baseDeliveryFee,
-                        deliveryPerKmRate,
+                        baseDeliveryFee: priceBreakdown?.baseDeliveryFee,
+                        deliveryPerKmRate: priceBreakdown?.deliveryPerKmRate,
                         restaurantCommissionRate,
-                        serviceFeeRate,
-                        freeDeliveryThreshold: 3.0
+                        serviceFeeRate: 0.02,
+                        freeDeliveryThreshold: 1.0
                       }
                     }
                   });

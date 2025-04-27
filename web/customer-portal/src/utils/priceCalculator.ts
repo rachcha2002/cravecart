@@ -6,11 +6,11 @@ interface PriceCalculatorParams {
   foodSubtotal: number;
   deliveryDistanceKM: number;
   tipAmount?: number;
-  baseDeliveryFee: number;
-  deliveryPerKmRate: number;
+  baseDeliveryFee?: number;
+  deliveryPerKmRate?: number;
   freeDeliveryThresholdKM?: number;
   restaurantCommissionRate: number;
-  serviceFeeRate: number;
+  serviceFeeRate?: number;
 }
 
 interface PriceBreakdown {
@@ -24,6 +24,7 @@ interface PriceBreakdown {
   tax: number;
   total: number;
   driverEarnings: number;
+  deliveryPerKmRate: number;
 }
 
 /**
@@ -33,11 +34,11 @@ export const calculateOrderPrices = ({
   foodSubtotal,
   deliveryDistanceKM,
   tipAmount = 0,
-  baseDeliveryFee,
-  deliveryPerKmRate,
-  freeDeliveryThresholdKM = 3, // Default free threshold of 3km
+  baseDeliveryFee = 150,
+  deliveryPerKmRate = 45,
+  freeDeliveryThresholdKM = 1, // Default free threshold of 1km
   restaurantCommissionRate,
-  serviceFeeRate,
+  serviceFeeRate=0.02,
 }: PriceCalculatorParams): PriceBreakdown => {
   // Calculate restaurant commission (comes from the food subtotal)
   const restaurantCommission = foodSubtotal * (restaurantCommissionRate / 100);
@@ -55,7 +56,7 @@ export const calculateOrderPrices = ({
   // Calculate tax (assuming 8% for now, could be parameterized)
   // Applying tax to food subtotal and service fee, but not delivery fee or tips
   // This may vary by jurisdiction
-  const taxRate = 0.08;
+  const taxRate = 0.04;
   const tax = (foodSubtotal + serviceFee) * taxRate;
   
   // Calculate driver earnings (delivery fee + tip)
@@ -76,7 +77,8 @@ export const calculateOrderPrices = ({
     serviceFee,
     tax,
     total,
-    driverEarnings
+    driverEarnings,
+    deliveryPerKmRate
   };
 };
 
@@ -84,7 +86,7 @@ export const calculateOrderPrices = ({
  * Format a number as currency
  */
 export const formatCurrency = (amount: number): string => {
-  return amount.toFixed(2);
+  return `Rs. ${amount.toFixed(2)}`;
 };
 
 /**
