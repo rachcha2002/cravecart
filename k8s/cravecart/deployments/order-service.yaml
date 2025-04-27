@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: cravecart/order-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5003
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: PORT_ORDER
+        - name: SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: SERVICE_NAME_ORDER
+        - name: MONGODB_URI
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: MONGODB_URI
+        envFrom:
+        - configMapRef:
+            name: service-urls
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10

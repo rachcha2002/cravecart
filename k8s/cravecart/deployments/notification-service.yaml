@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: cravecart/notification-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5005
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: PORT_NOTIFICATION
+        - name: SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: SERVICE_NAME_NOTIFICATION
+        - name: MONGODB_URI
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: MONGODB_URI
+        - name: EMAIL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: EMAIL_PASSWORD
+        - name: NOTIFYLK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: NOTIFYLK_API_KEY
+        envFrom:
+        - configMapRef:
+            name: service-urls
+        - configMapRef:
+            name: notification-config
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5005
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5005
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10

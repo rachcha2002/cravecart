@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restaurant-portal
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: restaurant-portal
+  template:
+    metadata:
+      labels:
+        app: restaurant-portal
+    spec:
+      containers:
+      - name: restaurant-portal
+        image: cravecart/restaurant-portal:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "300m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+        envFrom:
+        - configMapRef:
+            name: frontend-configs
+        - configMapRef:
+            name: service-urls
+        env:
+        - name: REACT_APP_CLOUDINARY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: CLOUDINARY_API_KEY
+        - name: GREACT_APP_GOOGLE_MAPS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: GOOGLE_MAPS_API_KEY
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 30

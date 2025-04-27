@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-config
+data:
+  EMAIL_SERVICE: "gmail"
+  EMAIL_USER: "notifycravecart@gmail.com"
+  EMAIL_FROM: "notifycravecart@gmail.com"
+  NOTIFYLK_USER_ID: "29429" 
+  NOTIFYLK_SENDER_ID: "NotifyDEMO"
+  CLIENT_URL: "http://cravecart.local"

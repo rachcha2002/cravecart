@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restaurant-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: restaurant-service
+  template:
+    metadata:
+      labels:
+        app: restaurant-service
+    spec:
+      containers:
+      - name: restaurant-service
+        image: cravecart/restaurant-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5004
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: PORT_RESTAURANT
+        - name: SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: SERVICE_NAME_RESTAURANT
+        - name: MONGODB_URI
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: MONGODB_URI
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: JWT_SECRET
+        envFrom:
+        - configMapRef:
+            name: service-urls
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5004
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5004
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10

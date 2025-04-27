@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+      - name: payment-service
+        image: cravecart/payment-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5002
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: PORT_PAYMENT
+        - name: SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: SERVICE_NAME_PAYMENT
+        - name: MONGODB_URI
+          valueFrom:
+            configMapKeyRef:
+              name: service-configs
+              key: MONGODB_URI
+        - name: STRIPE_SECRET_KEY_RENAMED
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: STRIPE_SECRET_KEY_RENAMED
+        envFrom:
+        - configMapRef:
+            name: service-urls
+        - configMapRef:
+            name: payment-config
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10

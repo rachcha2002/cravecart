@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-urls
+data:
+  # Service URLs (using Kubernetes service discovery)
+  ORDER_SERVICE_URL: "http://order-service:5003"
+  RESTAURANT_SERVICE_URL: "http://restaurant-service:5004"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:5005"
+  DELIVERY_SERVICE_URL: "http://delivery-service:3005"
+  PAYMENT_SERVICE_URL: "http://payment-service:5002"
+  USER_SERVICE_URL: "http://user-service:3001"
+  
+  # Web URLs (using Ingress)
+  CUSTOMER_WEB_URL: "http://cravecart.local"
+  ADMIN_WEB_URL: "http://admin.cravecart.local"
+  RESTAURANT_WEB_URL: "http://restaurant.cravecart.local"
+  
+  # Mobile URLs
+  DELIVERY_MOBILE_URL: "http://delivery.cravecart.local"

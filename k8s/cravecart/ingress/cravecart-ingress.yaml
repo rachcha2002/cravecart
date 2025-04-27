@@ -1,0 +1,81 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cravecart-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  rules:
+  - host: cravecart.local
+    http:
+      paths:
+      - path: /api/users(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 3001
+      - path: /api/restaurants(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: restaurant-service
+            port:
+              number: 5004
+      - path: /api/orders(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: order-service
+            port:
+              number: 5003
+      - path: /api/payments(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: payment-service
+            port:
+              number: 5002
+      - path: /api/deliveries(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: delivery-service
+            port:
+              number: 3005
+      - path: /api/notifications(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: notification-service
+            port:
+              number: 5005
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: customer-portal
+            port:
+              number: 80
+  - host: restaurant.cravecart.local
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: restaurant-portal
+            port:
+              number: 80
+  - host: admin.cravecart.local
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-portal
+            port:
+              number: 80
