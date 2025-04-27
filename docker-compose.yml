@@ -6,12 +6,8 @@ services:
     build:
       context: ./services/user-service
       dockerfile: Dockerfile
-    environment:
-      - PORT=3001
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRATION=7d
-      - SERVICE_NAME=user-service
+    env_file:
+      - ./services/user-service/.env
     volumes:
       - ./services/user-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -35,11 +31,8 @@ services:
     build:
       context: ./services/restaurant-service
       dockerfile: Dockerfile
-    environment:
-      - PORT=5004
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_NAME=restaurant-service
+    env_file:
+      - ./services/restaurant-service/.env
     volumes:
       - ./services/restaurant-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -63,14 +56,8 @@ services:
     build:
       context: ./services/order-service
       dockerfile: Dockerfile
-    environment:
-      - PORT=5003
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - RESTAURANT_SERVICE_URL=http://restaurant-service:5004
-      - USER_SERVICE_URL=http://user-service:3001
-      - NOTIFICATION_SERVICE_URL=http://notification-service:5005
-      - NODE_ENV=${NODE_ENV:-development}
+    env_file:
+      - ./services/order-service/.env
     volumes:
       - ./services/order-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -98,14 +85,8 @@ services:
     build:
       context: ./services/payment-service
       dockerfile: Dockerfile
-    environment:
-      - PORT=5002
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - ORDER_SERVICE_URL=http://order-service:5003
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
-      - NODE_ENV=${NODE_ENV:-development}
+    env_file:
+      - ./services/payment-service/.env
     volumes:
       - ./services/payment-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -131,12 +112,8 @@ services:
     build:
       context: ./services/delivery-service
       dockerfile: Dockerfile
-    environment:
-      - PORT=3005
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - ORDER_SERVICE_URL=http://order-service:5003
-      - SERVICE_NAME=delivery-service
+    env_file:
+      - ./services/delivery-service/.env
     volumes:
       - ./services/delivery-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -162,11 +139,8 @@ services:
     build:
       context: ./services/notification-service
       dockerfile: Dockerfile
-    environment:
-      - PORT=5005
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - SERVICE_NAME=notification-service
+    env_file:
+      - ./services/notification-service/.env
     volumes:
       - ./services/notification-service:/usr/src/app
       - /usr/src/app/node_modules
