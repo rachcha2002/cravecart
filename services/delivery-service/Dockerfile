@@ -8,6 +8,11 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3000
+# Expose the correct port for delivery service
+EXPOSE 3005
 
-CMD ["npm", "start"]
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3005/health || exit 1
+
+# Use node directly instead of npm for better container signal handling
+CMD ["node", "src/server.js"]

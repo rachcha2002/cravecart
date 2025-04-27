@@ -1,101 +1,64 @@
 version: "3.8"
 
 services:
-  # API Gateway Service
-  api-gateway:
-    build:
-      context: ./services/api-gateway
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000
-      - MONGODB_URI=${MONGODB_URI}
-      - USER_SERVICE_URL=http://user-service:3000
-      - SERVICE_NAME=api-gateway
-    depends_on:
-      - user-service
-    volumes:
-      - ./services/api-gateway:/app
-      - /app/node_modules
-    networks:
-      - cravecart-network
-
   # User Service
   user-service:
     build:
       context: ./services/user-service
       dockerfile: Dockerfile
     environment:
-      - PORT=3000
+      - PORT=3001
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=7d
       - SERVICE_NAME=user-service
     volumes:
-      - ./services/user-service:/app
-      - /app/node_modules
+      - ./services/user-service:/usr/src/app
+      - /usr/src/app/node_modules
     networks:
       - cravecart-network
     ports:
-      - "3001:3000"
+      - "3001:3001"
     deploy:
       resources:
         limits:
           memory: ${DOCKER_MEMORY_LIMIT:-2g}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Customer Portal Web App
-  customer-portal:
-    build:
-      context: ./web/customer-portal
-      dockerfile: Dockerfile
-    ports:
-      - "3001:80"
-    environment:
-      - REACT_APP_API_URL=http://localhost:3000
-      - REACT_APP_NAME=CraveCart
-    networks:
-      - cravecart-network
-    deploy:
-      resources:
-        limits:
-          memory: ${DOCKER_MEMORY_LIMIT:-2g}
-    restart: unless-stopped
-
-  # Restaurant Portal Web App
-  restaurant-portal:
-    build:
-      context: ./web/restaurant-portal
-      dockerfile: Dockerfile
-    ports:
-      - "3002:80"
-    environment:
-      - REACT_APP_API_URL=http://localhost:3000
-      - REACT_APP_NAME=CraveCart
-    networks:
-      - cravecart-network
-    deploy:
-      resources:
-        limits:
-          memory: ${DOCKER_MEMORY_LIMIT:-2g}
-    restart: unless-stopped
-
+  # Restaurant Service
   restaurant-service:
     build:
-      context: ./restaurant-service
+      context: ./services/restaurant-service
       dockerfile: Dockerfile
     environment:
+      - PORT=5004
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_NAME=restaurant-service
+    volumes:
+      - ./services/restaurant-service:/usr/src/app
+      - /usr/src/app/node_modules
+    networks:
+      - cravecart-network
     ports:
-      - "3002:3000"
+      - "5004:5004"
     deploy:
       resources:
         limits:
           memory: ${DOCKER_MEMORY_LIMIT:-2g}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # Order Service
   order-service:
     build:
       context: ./services/order-service
@@ -104,9 +67,13 @@ services:
       - PORT=5003
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
-      - RESTAURANT_SERVICE_URL=${RESTAURANT_SERVICE_URL}
-      - USER_SERVICE_URL=${USER_SERVICE_URL}
+      - RESTAURANT_SERVICE_URL=http://restaurant-service:5004
+      - USER_SERVICE_URL=http://user-service:3001
+      - NOTIFICATION_SERVICE_URL=http://notification-service:5005
       - NODE_ENV=${NODE_ENV:-development}
+    volumes:
+      - ./services/order-service:/usr/src/app
+      - /usr/src/app/node_modules
     ports:
       - "5003:5003"
     networks:
@@ -119,12 +86,14 @@ services:
     depends_on:
       - restaurant-service
       - user-service
+      - notification-service
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5003/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # Payment Service
   payment-service:
     build:
       context: ./services/payment-service
@@ -134,9 +103,12 @@ services:
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - ORDER_SERVICE_URL=http://order-service:5003
-      - STRIPE_SECRET_KEY_RENAMED=${STRIPE_SECRET_KEY}
-      - STRIPE_PUBLISHABLE_KEY_RENAMED=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
       - NODE_ENV=${NODE_ENV:-development}
+    volumes:
+      - ./services/payment-service:/usr/src/app
+      - /usr/src/app/node_modules
     ports:
       - "5002:5002"
     networks:
@@ -154,16 +126,24 @@ services:
       timeout: 10s
       retries: 3
 
+  # Delivery Service
   delivery-service:
     build:
-      context: ./delivery-service
+      context: ./services/delivery-service
       dockerfile: Dockerfile
     environment:
+      - PORT=3005
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
-      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL}
+      - ORDER_SERVICE_URL=http://order-service:5003
+      - SERVICE_NAME=delivery-service
+    volumes:
+      - ./services/delivery-service:/usr/src/app
+      - /usr/src/app/node_modules
     ports:
-      - "3005:3000"
+      - "3005:3005"
+    networks:
+      - cravecart-network
     deploy:
       resources:
         limits:
@@ -171,21 +151,39 @@ services:
     restart: unless-stopped
     depends_on:
       - order-service
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # Notification Service
   notification-service:
     build:
-      context: ./notification-service
+      context: ./services/notification-service
       dockerfile: Dockerfile
     environment:
+      - PORT=5005
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_NAME=notification-service
+    volumes:
+      - ./services/notification-service:/usr/src/app
+      - /usr/src/app/node_modules
     ports:
-      - "3006:3000"
+      - "5005:5005"
+    networks:
+      - cravecart-network
     deploy:
       resources:
         limits:
           memory: ${DOCKER_MEMORY_LIMIT:-2g}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   cravecart-network:
