@@ -206,110 +206,123 @@ const createNotification = async (req, res) => {
                 break;
               }
 
+              // Determine the appropriate client URL based on user role
+              let clientUrl = process.env.CLIENT_URL; // Default fallback URL
+
+              if (user.role === "CUSTOMER") {
+                clientUrl =
+                  process.env.CUSTOMER_WEB_URL || process.env.CLIENT_URL;
+              } else if (user.role === "ADMIN") {
+                clientUrl = process.env.ADMIN_WEB_URL || process.env.CLIENT_URL;
+              } else if (user.role === "RESTAURANT_OWNER") {
+                clientUrl =
+                  process.env.RESTAURANT_WEB_URL || process.env.CLIENT_URL;
+              }
+
               const htmlContent = `
-                      <!DOCTYPE html>
-                      <html lang="en">
-                      <head>
-                          <meta charset="UTF-8">
-                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                          <title>CraveCart Notification</title>
-                          <style>
-                              body, html {
-                                  margin: 0;
-                                  padding: 0;
-                                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                                  line-height: 1.6;
-                                  color: #333;
-                                  background-color: #f8f9fa;
-                              }
-                              .email-container {
-                                  max-width: 600px;
-                                  margin: 0 auto;
-                                  background-color: #ffffff;
-                                  border-radius: 8px;
-                                  overflow: hidden;
-                                  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                              }
-                              .email-header {
-                                  background-color: #FF6B35;
-                                  padding: 20px;
-                                  text-align: center;
-                              }
-                              .logo {
-                                  max-width: 180px;
-                                  height: auto;
-                              }
-                              .email-content {
-                                  padding: 30px;
-                              }
-                              .email-title {
-                                  font-size: 24px;
-                                  font-weight: 600;
-                                  color: #FF6B35;
-                                  margin-bottom: 20px;
-                              }
-                              .email-message {
-                                  font-size: 16px;
-                                  color: #555;
-                                  margin-bottom: 25px;
-                              }
-                              .cta-button {
-                                  display: inline-block;
-                                  background-color: #FF6B35;
-                                  color: #ffffff !important;
-                                  text-decoration: none;
-                                  padding: 12px 24px;
-                                  border-radius: 4px;
-                                  font-weight: 600;
-                                  margin-top: 10px;
-                              }
-                              .email-footer {
-                                  background-color: #f1f1f1;
-                                  padding: 20px;
-                                  text-align: center;
-                                  font-size: 14px;
-                                  color: #777;
-                              }
-                              
-                              @media screen and (max-width: 480px) {
-                                  .email-container {
-                                      width: 100%;
-                                      border-radius: 0;
-                                  }
-                                  .email-content {
-                                      padding: 20px;
-                                  }
-                                  .email-title {
-                                      font-size: 20px;
-                                  }
-                              }
-                          </style>
-                      </head>
-                      <body>
-                          <div class="email-container">
-                              <div class="email-header">
-                                  <img src="https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745527245/logo_jxgxfg.png" alt="CraveCart Logo" class="logo">
-                              </div>
-                              <div class="email-content">
-                                  <h1 class="email-title">${title}</h1>
-                                  <div class="email-message">
-                                      ${message}
-                                  </div>
-                                  <a href="${
-                                    actionUrl || process.env.CLIENT_URL
-                                  }" class="cta-button">${
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                      <meta charset="UTF-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <title>CraveCart Notification</title>
+                      <style>
+                        body, html {
+                          margin: 0;
+                          padding: 0;
+                          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                          line-height: 1.6;
+                          color: #333;
+                          background-color: #f8f9fa;
+                        }
+                        .email-container {
+                          max-width: 600px;
+                          margin: 0 auto;
+                          background-color: #ffffff;
+                          border-radius: 8px;
+                          overflow: hidden;
+                          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                        }
+                        .email-header {
+                          background-color: #FF6B35;
+                          padding: 20px;
+                          text-align: center;
+                        }
+                        .logo {
+                          max-width: 180px;
+                          height: auto;
+                        }
+                        .email-content {
+                          padding: 30px;
+                        }
+                        .email-title {
+                          font-size: 24px;
+                          font-weight: 600;
+                          color: #FF6B35;
+                          margin-bottom: 20px;
+                        }
+                        .email-message {
+                          font-size: 16px;
+                          color: #555;
+                          margin-bottom: 25px;
+                        }
+                        .cta-button {
+                          display: inline-block;
+                          background-color: #FF6B35;
+                          color: #ffffff !important;
+                          text-decoration: none;
+                          padding: 12px 24px;
+                          border-radius: 4px;
+                          font-weight: 600;
+                          margin-top: 10px;
+                        }
+                        .email-footer {
+                          background-color: #f1f1f1;
+                          padding: 20px;
+                          text-align: center;
+                          font-size: 14px;
+                          color: #777;
+                        }
+                        
+                        @media screen and (max-width: 480px) {
+                          .email-container {
+                            width: 100%;
+                            border-radius: 0;
+                          }
+                          .email-content {
+                            padding: 20px;
+                          }
+                          .email-title {
+                            font-size: 20px;
+                          }
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="email-container">
+                        <div class="email-header">
+                          <img src="https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745527245/logo_jxgxfg.png" alt="CraveCart Logo" class="logo">
+                        </div>
+                        <div class="email-content">
+                          <h1 class="email-title">${title}</h1>
+                          <div class="email-message">
+                            ${message}
+                          </div>
+                          <a href="${
+                            actionUrl || clientUrl
+                          }" class="cta-button">${
                 actionText || "Visit CraveCart"
               }</a>
-                              </div>
-                              <div class="email-footer">
-                                  <p>© ${new Date().getFullYear()} CraveCart. All rights reserved.</p>
-                                  <p>This is an automated notification. Please do not reply to this email.</p>
-                                  
-                              </div>
-                          </div>
-                      </body>
-                      </html>
-                      `;
+                        </div>
+                        <div class="email-footer">
+                          <p>© ${new Date().getFullYear()} CraveCart. All rights reserved.</p>
+                          <p>This is an automated notification. Please do not reply to this email.</p>
+                          
+                        </div>
+                      </div>
+                    </body>
+                    </html>
+                    `;
 
               // Prepare email options with HTML and optional attachments
               const emailOptions = {
@@ -615,6 +628,19 @@ const sendDirectNotification = async (req, res) => {
                 break;
               }
 
+              // Determine the appropriate client URL based on user role
+              let clientUrl = process.env.CLIENT_URL; // Default fallback URL
+
+              if (user.role === "CUSTOMER") {
+                clientUrl =
+                  process.env.CUSTOMER_WEB_URL || process.env.CLIENT_URL;
+              } else if (user.role === "ADMIN") {
+                clientUrl = process.env.ADMIN_WEB_URL || process.env.CLIENT_URL;
+              } else if (user.role === "RESTAURANT_OWNER") {
+                clientUrl =
+                  process.env.RESTAURANT_WEB_URL || process.env.CLIENT_URL;
+              }
+
               const htmlContent = `
                       <!DOCTYPE html>
                       <html lang="en">
@@ -705,7 +731,7 @@ const sendDirectNotification = async (req, res) => {
                                       ${message}
                                   </div>
                                   <a href="${
-                                    actionUrl || process.env.CLIENT_URL
+                                    actionUrl || clientUrl
                                   }" class="cta-button">${
                 actionText || "Visit CraveCart"
               }</a>

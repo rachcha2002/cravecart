@@ -4,12 +4,12 @@ const userServiceBaseUrl = process.env.USER_SERVICE_URL || 'http://localhost:300
 
 const getUserById = async (id) => {
   try {
-    // Get auth token from environment variable or config
+    // Get auth token from environment variable 
     const authToken = process.env.USER_SERVICE_API_KEY || 'your_api_key_here';
     
     const response = await axios.get(`${userServiceBaseUrl}/api/users/${id}`, {
       headers: {
-        'Authorization': `Bearer ${authToken}` // Common format for JWT tokens
+        'Authorization': `Bearer ${authToken}`
         
       }
     });

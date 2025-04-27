@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import * as Location from 'expo-location';
 import io from 'socket.io-client';
+import { API_URLS } from '../../src/api/authApi';
 
 interface Restaurant {
   _id: string;
@@ -113,9 +114,8 @@ export default function OrdersScreen() {
 
   // Initialize socket connection
   useEffect(() => {
-    // Create socket connection
-    // ISSUE: Socket URL might be incorrect - currently using port 5005 instead of 3005
-    const socket = io('http://192.168.121.59:3005'); // FIXED: Changed from 5005 to 3005
+    // Create socket connection using centralized config
+    const socket = io(API_URLS.SOCKET_SERVICE);
     setSocketInstance(socket);
 
     // Socket event handlers
@@ -156,7 +156,7 @@ export default function OrdersScreen() {
         const longitude = user.deliveryInfo.currentLocation.coordinates[0];
         const latitude = user.deliveryInfo.currentLocation.coordinates[1];
         
-        const response = await fetch('http://192.168.121.59:5003/api/deliveries/nearbyorders', {
+        const response = await fetch(`${API_URLS.ORDER_SERVICE}/nearbyorders`, {
           method: 'POST', 
           headers: {
             'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ export default function OrdersScreen() {
       setError(null);
       
       try {
-        const response = await fetch(`http://192.168.121.59:3005/api/deliveries/delivery/getdeliveriesbydriverid/${user._id}`);
+        const response = await fetch(`${API_URLS.DELIVERY_SERVICE}/delivery/getdeliveriesbydriverid/${user._id}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -273,7 +273,7 @@ export default function OrdersScreen() {
   const handleAcceptOrder = async (orderId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URLS.ORDER_SERVICE}/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -307,7 +307,7 @@ export default function OrdersScreen() {
       try {
         const order = ordersData.find(o => o._id === orderId);
         if (order && order.user && order.user._id) {
-          await fetch('http://192.168.121.59:5005/api/notifications/senddirect', {
+          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/senddirect`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -350,7 +350,7 @@ export default function OrdersScreen() {
   const handlePickupOrder = async (orderId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URLS.ORDER_SERVICE}/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -381,7 +381,7 @@ export default function OrdersScreen() {
       try {
         const order = ordersData.find(o => o._id === orderId);
         if (order && order.user && order.user._id) {
-          await fetch('http://192.168.121.59:5005/api/notifications/senddirect', {
+          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/senddirect`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -416,7 +416,7 @@ export default function OrdersScreen() {
       // Stop sending location updates for this order
       stopSendingLocation(orderId);
       
-      const response = await fetch(`http://192.168.121.59:5003/api/deliveries/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URLS.ORDER_SERVICE}/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -441,7 +441,7 @@ export default function OrdersScreen() {
       try {
         const order = ordersData.find(o => o._id === orderId);
         if (order && order.user && order.user._id) {
-          await fetch('http://192.168.121.59:5005/api/notifications/senddirect', {
+          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/senddirect`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -480,7 +480,7 @@ export default function OrdersScreen() {
         
         console.log('Delivery payload:', deliveryPayload);
         
-        const deliveryResponse = await fetch('http://192.168.121.59:3005/api/deliveries/delivery/createdelivery', {
+        const deliveryResponse = await fetch(`${API_URLS.DELIVERY_SERVICE}/delivery/createdelivery`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -508,7 +508,7 @@ export default function OrdersScreen() {
       if (currentLocation && user?._id) {
         const { longitude, latitude } = currentLocation.coords;
         console.log('Current GPS coordinates:', { longitude, latitude });
-        const locationResponse = await fetch(`http://192.168.121.59:3001/api/deliveries/updatelocation/${user._id}`, {
+        const locationResponse = await fetch(`${API_URLS.AUTH_SERVICE}/users/delivery/updatelocation/${user._id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

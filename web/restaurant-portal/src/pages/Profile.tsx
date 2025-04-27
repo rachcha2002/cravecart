@@ -182,7 +182,7 @@ const Profile = () => {
           {
             url,
             description: "Restaurant image",
-            isPrimary: false,
+            isPrimary: true,
             _id: Date.now().toString(), // Temporary ID
             uploadedAt: new Date().toISOString(),
           },

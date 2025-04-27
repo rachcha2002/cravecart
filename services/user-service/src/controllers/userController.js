@@ -104,6 +104,27 @@ const updateUser = async (req, res) => {
     // Update user fields
     const updateData = { ...req.body, updatedAt: Date.now() };
 
+    if (updateData.restaurantInfo && updateData.restaurantInfo.images) {
+      // Process images before saving
+      updateData.restaurantInfo.images = updateData.restaurantInfo.images.map(
+        (image) => {
+          // Check if image has a MongoDB ObjectId (_id is 24 chars)
+          const isExistingImage =
+            typeof image._id === "string" &&
+            /^[0-9a-fA-F]{24}$/.test(image._id);
+
+          // For existing images, keep the _id
+          if (isExistingImage) {
+            return image;
+          }
+
+          // For new images, remove the temporary _id so MongoDB can generate a proper one
+          const { _id, ...imageWithoutId } = image;
+          return imageWithoutId;
+        }
+      );
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { $set: updateData },
@@ -151,7 +172,7 @@ const updateUserStatus = async (req, res) => {
     // Send notification to the user about status change
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -211,7 +232,7 @@ const verifyUser = async (req, res) => {
     // Send notification to the user about verification status change
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -261,7 +282,7 @@ const deleteUser = async (req, res) => {
     // Send notification to the user about account deletion
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -557,7 +578,7 @@ const updateRestaurantDescription = async (req, res) => {
     // Send notification to the restaurant owner about description update
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -758,7 +779,7 @@ const deactivateOwnAccount = async (req, res) => {
     // Send notification to the user about account deactivation
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -902,7 +923,7 @@ const updateDeliveryDocuments = async (req, res) => {
 
     // Notify admin about new document upload
     try {
-      await fetch(`${process.env.Notification_SERVICE_URL}/api/notifications`, {
+      await fetch(`${process.env.NOTIFICATION_SERVICE_URL}/api/notifications`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -983,7 +1004,7 @@ const verifyDeliveryDocument = async (req, res) => {
     // Notify user about document verification status
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -1102,7 +1123,7 @@ const resetUserPassword = async (req, res) => {
     // Send notification to the user about password reset
     try {
       await fetch(
-        `${process.env.Notification_SERVICE_URL}/api/notifications/senddirect`,
+        `${process.env.NOTIFICATION_SERVICE_URL}/api/notifications/senddirect`,
         {
           method: "POST",
           headers: {
@@ -1114,15 +1135,15 @@ const resetUserPassword = async (req, res) => {
             message: `Your password has been reset. Your new password is ${newPassword}. Please change it after logging in.`,
             channels: ["Email"],
             ...(user.role === "customer" && {
-              actionUrl: `${process.env.Customer_WEB_URL}/login`,
+              actionUrl: `${process.env.CUSTOMER_WEB_URL}/login`,
               apiText: `Visit to login and change your password`,
             }),
             ...(user.role === "admin" && {
-              actionUrl: `${process.env.Admin_WEB_URL}/login`,
+              actionUrl: `${process.env.ADMIN_WEB_URL}/login`,
               apiText: `Visit to login and change your password`,
             }),
             ...(user.role === "restaurant" && {
-              actionUrl: `${process.env.Restaurant_WEB_URL}/login`,
+              actionUrl: `${process.env.RESTAURANT_WEB_URL}/login`,
               apiText: `Visit to login and change your password`,
             }),
             // No actionUrl or apiText for delivery role
@@ -1177,7 +1198,7 @@ const createAdmin = async (req, res) => {
 
     // Send notification to all existing admins about new admin creation
     try {
-      await fetch(`${process.env.Notification_SERVICE_URL}/api/notifications`, {
+      await fetch(`${process.env.NOTIFICATION_SERVICE_URL}/api/notifications`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
