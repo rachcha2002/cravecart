@@ -38,11 +38,8 @@ const PaymentSuccessPage: React.FC = () => {
   // Handle nested data structure
   const calculatedOrderData = rawCalculatedData || orderData?.calculatedOrderData || orderData;
 
-  // Convert USD to LKR for display
-  const USD_TO_LKR_RATE = 325;
-  const paidAmount = paymentAmount || (calculatedOrderData?.priceBreakdown?.total 
-    ? Math.round(calculatedOrderData.priceBreakdown.total * USD_TO_LKR_RATE) 
-    : 0);
+  // Use direct amount without conversion
+  const paidAmount = paymentAmount || (calculatedOrderData?.priceBreakdown?.total || 0);
   const paidCurrency = paymentCurrency || 'lkr';
 
   // Clean up and send email notification
@@ -166,8 +163,8 @@ const PaymentSuccessPage: React.FC = () => {
                   </div>
                   
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Paid (LKR):</span>
-                    <span className="dark:text-white">Rs. {paidAmount.toFixed(2)}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Paid:</span>
+                    <span className="dark:text-white">{formatCurrency(paidAmount)}</span>
                   </div>
                 </div>
               )}
