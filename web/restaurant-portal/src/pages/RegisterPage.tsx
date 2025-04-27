@@ -114,7 +114,12 @@ const RegisterPage: React.FC = () => {
     e.preventDefault();
     try {
       await register(formData);
-      navigate("/dashboard");
+      navigate("/login", {
+        state: {
+          message:
+            "Registration successful! Please log in with your credentials.",
+        },
+      });
     } catch (error) {
       console.error("Registration failed:", error);
     }

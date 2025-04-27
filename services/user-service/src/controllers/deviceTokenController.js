@@ -21,6 +21,8 @@ const registerDeviceToken = async (req, res) => {
     const { userId } = req.params;
     const { token, platform } = req.body;
 
+    console.log("Registering device token:", { userId, token, platform });
+
     // Validate input
     if (!token || !platform) {
       return res.status(400).json({
@@ -38,7 +40,7 @@ const registerDeviceToken = async (req, res) => {
     }
 
     // Verify user exists and is active
-    const user = await User.findOne({ _id: userId, status: "ACTIVE" });
+    const user = await User.findOne({ _id: userId, status: "active" });
 
     if (!user) {
       return res.status(404).json({

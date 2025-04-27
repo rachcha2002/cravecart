@@ -140,15 +140,15 @@ router.get("/contact/:id", userController.getUserContactInfo);
 
 // Device token routes
 router.post(
-  "/users/:userId/device-tokens",
+  "/pushes/:userId/device-tokens",
   deviceTokenController.registerDeviceToken
 );
 router.delete(
-  "/users/:userId/device-tokens/:token",
+  "/pushes/:userId/device-tokens/:token",
   deviceTokenController.removeDeviceToken
 );
 router.get(
-  "/users/:userId/device-tokens",
+  "/pushes/:userId/device-tokens",
   deviceTokenController.getUserDeviceTokens
 );
 

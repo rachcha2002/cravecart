@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "525920526045",
+    "project_id": "cravecart-3b96c",
+    "storage_bucket": "cravecart-3b96c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:525920526045:android:1746fc7a01876464358534",
+        "android_client_info": {
+          "package_name": "com.cravecart.riderapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHy7ZTXSDLKpVVDXlF2ODhZ8Zt8jd3Uxc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

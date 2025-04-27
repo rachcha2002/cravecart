@@ -1,6 +1,6 @@
-// seed-menu.js
+// seed-menu.js for seeding the database with sample menu data
 const mongoose = require('mongoose');
-const Menu = require('../models/menu'); // Adjust path as needed
+const Menu = require('../models/menuModel');
 
 // MongoDB connection
 mongoose.connect('mongodb://localhost:27017/restaurant_management', {
@@ -10,8 +10,6 @@ mongoose.connect('mongodb://localhost:27017/restaurant_management', {
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Sample restaurant ID - replace with actual ID from your database
-const RESTAURANT_ID = new mongoose.Types.ObjectId('6803d14c69261470e97ecc5b');
 
 // Sample menu data
 const sampleMenu = {
