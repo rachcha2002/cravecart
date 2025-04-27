@@ -24,10 +24,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Hardcode the values for now - this will make debugging easier
-  // These should match exactly what you see in your Cloudinary dashboard
-  const cloudName = "dn1w8k2l1"; // Your cloud name
-  const uploadPreset = "restaurant_images"; // Your upload preset name
+  const uploadPreset = "restaurant_images";
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -48,16 +45,19 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     // Create form data for upload
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", uploadPreset);
+    formData.append(
+      "upload_preset",
+      process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || uploadPreset
+    );
 
     try {
       console.log(
-        `Uploading to: https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
+        `Uploading to: https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`
       );
 
       // Use fetch for simplicity during debugging
       const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
         {
           method: "POST",
           body: formData,
