@@ -307,7 +307,7 @@ export default function OrdersScreen() {
       try {
         const order = ordersData.find(o => o._id === orderId);
         if (order && order.user && order.user._id) {
-          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/senddirect`, {
+          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/notifications/senddirect`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -381,7 +381,7 @@ export default function OrdersScreen() {
       try {
         const order = ordersData.find(o => o._id === orderId);
         if (order && order.user && order.user._id) {
-          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/senddirect`, {
+          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/notifications/senddirect`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -441,7 +441,7 @@ export default function OrdersScreen() {
       try {
         const order = ordersData.find(o => o._id === orderId);
         if (order && order.user && order.user._id) {
-          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/senddirect`, {
+          await fetch(`${API_URLS.NOTIFICATION_SERVICE}/notifications/senddirect`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
