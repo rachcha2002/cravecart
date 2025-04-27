@@ -1,6 +1,6 @@
 export const cloudinaryConfig = {
-  cloudName: "dn1w8k2l1",
-  uploadPreset: "delivery_profiles",
+  cloudName: process.env.EXPO_PUBLIC_CLOUDNAME,
+  uploadPreset: process.env.EXPO_PUBLIC_UPLOAD_PRESET,
 };
 
 export const uploadToCloudinary = async (uri, type) => {
