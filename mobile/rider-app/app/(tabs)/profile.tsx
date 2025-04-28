@@ -127,7 +127,6 @@ export default function Profile() {
   };
 
   // Handle logout
-  // In app/(tabs)/profile.tsx
   const handleLogout = async () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
@@ -136,7 +135,7 @@ export default function Profile() {
         style: "destructive",
         onPress: async () => {
           await logout(() => {
-            router.replace("/"); // Navigate to landing screen
+            router.replace("/login"); // Navigate to login screen instead of landing
           });
         },
       },

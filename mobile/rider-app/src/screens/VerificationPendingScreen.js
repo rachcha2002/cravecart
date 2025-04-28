@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -39,29 +40,34 @@ const VerificationPendingScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={styles.title}>Account Verification</Text>
-        <Text style={styles.message}>
-          Your account is being verified by our team. This process usually takes
-          24-48 hours. We'll notify you once your account is verified.
-        </Text>
-        <Text style={styles.status}>
-          Status: {verificationStatus === "pending" ? "Pending" : "Verified"}
-        </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <ActivityIndicator size="large" color="#FF6B6B" />
+          <Text style={styles.title}>Account Verification</Text>
+          <Text style={styles.message}>
+            Your account is being verified by our team. This process usually takes
+            24-48 hours. We'll notify you once your account is verified.
+          </Text>
+          <Text style={styles.status}>
+            Status: {verificationStatus === "pending" ? "Pending" : "Verified"}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Logout</Text>
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  container: {
+    flex: 1,
     padding: 20,
   },
   content: {
