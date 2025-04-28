@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: cravecart
+  
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: gcr.io/cravecart-457103/notification-service:latest
+        ports:
+        - containerPort: 5005
+        resources:
+          limits:
+            cpu: "1.0"
+            memory: "1536Mi"
+          requests:
+            cpu: "1.0"
+            memory: "1536Mi"
+        envFrom:
+        - configMapRef:
+            name: notification-service-config
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5005
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5005
+          initialDelaySeconds: 30

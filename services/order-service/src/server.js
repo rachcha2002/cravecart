@@ -293,15 +293,4 @@ process.on('unhandledRejection', (reason, promise) => {
   // Prevent abrupt shutdown, but log critical error
 });
 
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed');
-      process.exit(0);
-    });
-  });
-});
-
 module.exports = { app, io }; // Export both app and io for testing

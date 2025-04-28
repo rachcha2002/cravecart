@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restaurant-service
+  namespace: cravecart
+ 
+  labels:
+    app: restaurant-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: restaurant-service
+  template:
+    metadata:
+      labels:
+        app: restaurant-service
+    spec:
+      containers:
+      - name: restaurant-service
+        image: gcr.io/cravecart-457103/restaurant-service:latest
+        ports:
+        - containerPort: 5004
+        resources:
+          limits:
+            cpu: "1.0"
+            memory: "1536Mi"
+          requests:
+            cpu: "1.0"
+            memory: "1536Mi"
+        envFrom:
+        - configMapRef:
+            name: restaurant-service-config
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5004
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5004
+          initialDelaySeconds: 30

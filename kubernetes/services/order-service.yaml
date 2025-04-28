@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+ 
+  labels:
+    app: order-service
+  annotations:
+    cloud.google.com/load-balancer-ip: "34.49.43.70"
+spec:
+  selector:
+    app: order-service
+  ports:
+  - port: 5003
+    targetPort: 5003
+    name: http

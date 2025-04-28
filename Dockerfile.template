@@ -1,0 +1,16 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+# Health check route setup for Kubernetes
+RUN echo 'app.get("/api/health", (req, res) => { res.status(200).json({ status: "ok" }); });' >> src/index.js
+
+EXPOSE $PORT
+
+CMD ["npm", "start"] 
