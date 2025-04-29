@@ -159,6 +159,76 @@ services:
       timeout: 10s
       retries: 3
 
+  # Customer Portal Frontend
+  customer-portal:
+    build:
+      context: ./web/customer-portal
+      dockerfile: Dockerfile
+    env_file:
+      - ./web/customer-portal/.env
+    ports:
+      - "3000:80"
+    networks:
+      - cravecart-network
+    deploy:
+      resources:
+        limits:
+          memory: ${DOCKER_MEMORY_LIMIT:-1g}
+    restart: unless-stopped
+    depends_on:
+      - user-service
+      - restaurant-service
+      - order-service
+      - payment-service
+      - delivery-service
+      - notification-service
+
+  # Restaurant Portal Frontend
+  restaurant-portal:
+    build:
+      context: ./web/restaurant-portal
+      dockerfile: Dockerfile
+    env_file:
+      - ./web/restaurant-portal/.env
+    ports:
+      - "3002:80"
+    networks:
+      - cravecart-network
+    deploy:
+      resources:
+        limits:
+          memory: ${DOCKER_MEMORY_LIMIT:-1g}
+    restart: unless-stopped
+    depends_on:
+      - user-service
+      - restaurant-service
+      - order-service
+      - notification-service
+
+  # Admin Portal Frontend
+  admin-portal:
+    build:
+      context: ./web/admin-portal
+      dockerfile: Dockerfile
+    env_file:
+      - ./web/admin-portal/.env
+    ports:
+      - "3003:80"
+    networks:
+      - cravecart-network
+    deploy:
+      resources:
+        limits:
+          memory: ${DOCKER_MEMORY_LIMIT:-1g}
+    restart: unless-stopped
+    depends_on:
+      - user-service
+      - restaurant-service
+      - order-service
+      - payment-service
+      - delivery-service
+      - notification-service
+
 networks:
   cravecart-network:
     driver: bridge
