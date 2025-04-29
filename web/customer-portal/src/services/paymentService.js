@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = `${process.env.REACT_APP_PAYMENT_API_URL}/api/payments`||'http://localhost:5002/api/payments';
+const API_URL = `${process.env.REACT_APP_PAYMENT_API_URL}`||'http://localhost:5002/api/payments';
 
 // Helper for better error handling
 const handleApiError = (error, customMessage) => {

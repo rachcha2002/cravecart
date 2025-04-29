@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const ORDER_API_URL = process.env.REACT_APP_ORDER_SERVICE_URL || 'http://localhost:5003/api';
+const ORDER_API_URL = `${process.env.REACT_APP_ORDER_SERVICE_URL}/api` || 'http://localhost:5003/api';
 
 // Create axios instance
 const orderApiClient = axios.create({

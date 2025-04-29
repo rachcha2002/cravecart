@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: cravecart
+
+  labels:
+    app: user-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: gcr.io/cravecart-457103/user-service:latest
+        ports:
+        - containerPort: 3001
+        resources:
+          limits:
+            cpu: "1.0"
+            memory: "2048Mi"
+          requests:
+            cpu: "1.0"
+            memory: "2048Mi"
+        envFrom:
+        - configMapRef:
+            name: user-service-config
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30

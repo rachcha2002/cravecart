@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+
+  labels:
+    app: notification-service
+  annotations:
+    cloud.google.com/load-balancer-ip: "34.58.115.37"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "34.58.115.37"
+  selector:
+    app: notification-service
+  ports:
+  - port: 5005
+    targetPort: 5005
+    name: http

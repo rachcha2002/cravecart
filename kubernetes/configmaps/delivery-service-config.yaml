@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: delivery-service-config
+  namespace: cravecart
+  
+data:
+  PORT: "3005"
+  SERVICE_NAME: "delivery-service"
+  JWT_EXPIRATION: "7d"
+  MONGODB_URI: "mongodb+srv://cravecartlk:cravecart123@cluster0.8qk0a8n.mongodb.net/cravecart"
+  JWT_SECRET: "cravecart_jwt_secret_key"
+  
+  # Service URLs
+  ORDER_SERVICE_URL: "http://34.45.142.152:5003"
+  RESTAURANT_SERVICE_URL: "http://34.133.20.229:5004"
+  NOTIFICATION_SERVICE_URL: "http://34.58.115.37:5005"
+  DELIVERY_SERVICE_URL: "http://35.226.92.191:3005"
+  PAYMENT_SERVICE_URL: "http://34.121.113.108:5002"
+  USER_SERVICE_URL: "http://34.132.7.64:3001"
+  
+  # Web URLs
+  CUSTOMER_WEB_URL: "https://customer.cravecart.com"
+  ADMIN_WEB_URL: "https://admin.cravecart.com"
+  RESTAURANT_WEB_URL: "https://restaurant.cravecart.com"
+  
+  # Mobile URLs

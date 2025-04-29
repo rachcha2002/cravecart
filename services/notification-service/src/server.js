@@ -15,7 +15,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL,
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
@@ -147,6 +147,11 @@ notificationController.setSocketIO(io);
 
 // Routes
 app.use("/api/notifications", notificationRoutes);
+
+// Simple health check route
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'notification-service' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

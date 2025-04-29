@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: cravecart
+
+  labels:
+    app: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: gcr.io/cravecart-457103/order-service:latest
+        ports:
+        - containerPort: 5003
+        resources:
+          limits:
+            cpu: "1.0"
+            memory: "2048Mi"
+          requests:
+            cpu: "1.0"
+            memory: "2048Mi"
+        envFrom:
+        - configMapRef:
+            name: order-service-config
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 30

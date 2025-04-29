@@ -25,6 +25,11 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", service: serviceName });
 });
 
+// Add health check at /api/health path for Kubernetes probes
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", service: serviceName });
+});
+
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
