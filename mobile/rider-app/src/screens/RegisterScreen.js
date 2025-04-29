@@ -13,6 +13,7 @@ import { launchImageLibrary } from "react-native-image-picker";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cloudinary } from "../config/cloudinary";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const RegisterScreen = ({ navigation }) => {
   const [step, setStep] = useState(1);
@@ -181,50 +182,55 @@ const RegisterScreen = ({ navigation }) => {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.progressBar}>
-        <View style={[styles.progressStep, step >= 1 && styles.activeStep]} />
-        <View style={[styles.progressStep, step >= 2 && styles.activeStep]} />
-        <View style={[styles.progressStep, step >= 3 && styles.activeStep]} />
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressStep, step >= 1 && styles.activeStep]} />
+          <View style={[styles.progressStep, step >= 2 && styles.activeStep]} />
+          <View style={[styles.progressStep, step >= 3 && styles.activeStep]} />
+        </View>
 
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
 
-      <View style={styles.buttonContainer}>
-        {step > 1 && (
-          <TouchableOpacity
-            style={[styles.button, styles.backButton]}
-            onPress={() => setStep(step - 1)}
-          >
-            <Text style={styles.buttonText}>Back</Text>
-          </TouchableOpacity>
-        )}
-        {step < 3 ? (
-          <TouchableOpacity
-            style={[styles.button, styles.nextButton]}
-            onPress={() => setStep(step + 1)}
-          >
-            <Text style={styles.buttonText}>Next</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.button, styles.submitButton]}
-            onPress={handleSubmit}
-          >
-            <Text style={styles.buttonText}>Submit</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </ScrollView>
+        <View style={styles.buttonContainer}>
+          {step > 1 && (
+            <TouchableOpacity
+              style={[styles.button, styles.backButton]}
+              onPress={() => setStep(step - 1)}
+            >
+              <Text style={styles.buttonText}>Back</Text>
+            </TouchableOpacity>
+          )}
+          {step < 3 ? (
+            <TouchableOpacity
+              style={[styles.button, styles.nextButton]}
+              onPress={() => setStep(step + 1)}
+            >
+              <Text style={styles.buttonText}>Next</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, styles.submitButton]}
+              onPress={handleSubmit}
+            >
+              <Text style={styles.buttonText}>Submit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  container: {
+    flex: 1,
     padding: 20,
   },
   progressBar: {

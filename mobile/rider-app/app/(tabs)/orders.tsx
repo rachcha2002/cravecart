@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import {View,Text,StyleSheet,ScrollView,TouchableOpacity,SafeAreaView,Linking,Platform,ActivityIndicator,
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Linking,
+  Platform,
+  ActivityIndicator,
+  RefreshControl,
+  StatusBar
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import * as Location from 'expo-location';
 import io from 'socket.io-client';
 import { API_URLS } from '../../src/api/authApi';
+import { setupDarkStatusBar } from "../../src/utils/statusBarConfig";
+import ScreenLayout from '../../src/components/ScreenLayout';
 
 interface Restaurant {
   _id: string;
@@ -92,7 +105,6 @@ interface DeliveryHistory {
   earnMoney: number
 }
 
-// Add an interface for the location received response
 interface LocationReceivedResponse {
   success: boolean;
   timestamp: string;
@@ -109,6 +121,7 @@ export default function OrdersScreen() {
   const [deliveryHistory, setDeliveryHistory] = useState<DeliveryHistory[]>([]);
   const [locationTrackingActive, setLocationTrackingActive] = useState<{[orderId: string]: boolean}>({});
   const [socketInstance, setSocketInstance] = useState<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
   
   const auth = useAuth();
   const user = auth.user;
@@ -143,96 +156,118 @@ export default function OrdersScreen() {
     };
   }, []);
 
+  // Set up status bar appearance - use the setupDarkStatusBar 
+  // function for consistency instead of direct StatusBar calls
   useEffect(() => {
-    const fetchNearbyOrders = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        if (!user?.deliveryInfo?.currentLocation?.coordinates || 
-            user.deliveryInfo.currentLocation.coordinates.length !== 2) {
-          throw new Error('User location is not available');
-        }
-        
-        const longitude = user.deliveryInfo.currentLocation.coordinates[0];
-        const latitude = user.deliveryInfo.currentLocation.coordinates[1];
-        
-        const response = await fetch(`${API_URLS.ORDER_SERVICE}/nearbyorders`, {
-          method: 'POST', 
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ latitude, longitude })
-        });
+    // Use consistent status bar config across all screens
+    setupDarkStatusBar();
+    // No cleanup to maintain consistent behavior
+  }, []);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const responseData = await response.json();
-        
-        if (!responseData.success) {
-          throw new Error(responseData.message || 'Failed to fetch nearby orders');
-        }
-        
-        const processedOrders = responseData.data.map((order: any) => ({
-          ...order,
-          createdAt: order.createdAt,
-          updatedAt: order.updatedAt,
-          estimatedDeliveryTime: order.estimatedDeliveryTime,
-          deliveryTimeline: order.deliveryTimeline.map((event: any) => ({
-            ...event,
-            time: event.time
-          }))
-        }));
-
-        setOrdersData(processedOrders);
-      } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
-        setError(errorMessage);
-        console.error("Failed to fetch nearby orders:", e);
-      } finally {
-        setLoading(false);
+  // Function to fetch nearby orders
+  const fetchNearbyOrders = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (!user?.deliveryInfo?.currentLocation?.coordinates || 
+          user.deliveryInfo.currentLocation.coordinates.length !== 2) {
+        throw new Error('User location is not available');
       }
-    };
+      
+      const longitude = user.deliveryInfo.currentLocation.coordinates[0];
+      const latitude = user.deliveryInfo.currentLocation.coordinates[1];
+      
+      const response = await fetch(`${API_URLS.ORDER_SERVICE}/nearbyorders`, {
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ latitude, longitude })
+      });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const responseData = await response.json();
+      
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Failed to fetch nearby orders');
+      }
+      
+      const processedOrders = responseData.data.map((order: any) => ({
+        ...order,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        deliveryTimeline: order.deliveryTimeline.map((event: any) => ({
+          ...event,
+          time: event.time
+        }))
+      }));
+
+      setOrdersData(processedOrders);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+      setError(errorMessage);
+      console.error("Failed to fetch nearby orders:", e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     if (user) {
       fetchNearbyOrders();
     }
   }, [user]);
 
-  useEffect(() => {
-    const fetchDeliveryHistory = async () => {
-      if (activeTab !== 'Past' || !user?._id) return;
+  // Function to fetch delivery history
+  const fetchDeliveryHistory = async () => {
+    if (activeTab !== 'Past' || !user?._id) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_URLS.DELIVERY_SERVICE}/delivery/getdeliveriesbydriverid/${user._id}`);
       
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const response = await fetch(`${API_URLS.DELIVERY_SERVICE}/delivery/getdeliveriesbydriverid/${user._id}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.message || 'Failed to fetch delivery history');
-        }
-        
-        setDeliveryHistory(data.data || []);
-      } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
-        setError(`Failed to fetch delivery history: ${errorMessage}`);
-        console.error("Failed to fetch delivery history:", e);
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    };
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to fetch delivery history');
+      }
+      
+      setDeliveryHistory(data.data || []);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+      setError(`Failed to fetch delivery history: ${errorMessage}`);
+      console.error("Failed to fetch delivery history:", e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDeliveryHistory();
   }, [activeTab, user]);
+
+  // Refresh function for pull-to-refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (activeTab === 'Current') {
+      fetchNearbyOrders();
+    } else {
+      fetchDeliveryHistory();
+    }
+  };
 
   const openMapLink = (latitude: number, longitude: number, locationType: 'restaurant' | 'customer') => {
     const label = locationType === 'restaurant' ? 'Restaurant Location' : 'Delivery Address';
@@ -496,34 +531,40 @@ export default function OrdersScreen() {
         }
       }
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.warn('Permission to access location was denied');
-        return;
-      }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High
-      });
-
-      if (currentLocation && user?._id) {
-        const { longitude, latitude } = currentLocation.coords;
-        console.log('Current GPS coordinates:', { longitude, latitude });
-        const locationResponse = await fetch(`${API_URLS.AUTH_SERVICE}/users/delivery/updatelocation/${user._id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ longitude, latitude })
-        });
-        
-        if (!locationResponse.ok) {
-          console.warn('Failed to update driver location after delivery', await locationResponse.text());
-        } else {
-          console.log('Driver location successfully updated with GPS coordinates');
+      // Update driver location after delivery completion
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Permission to access location was denied');
+          return;
         }
-      } else {
-        console.warn('Could not obtain current GPS location');
+
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High
+        });
+
+        if (currentLocation && user?._id) {
+          const { longitude, latitude } = currentLocation.coords;
+          console.log('Current GPS coordinates after delivery:', { longitude, latitude });
+          const locationResponse = await fetch(`${API_URLS.AUTH_SERVICE}/deliveries/updatelocation/${user._id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ longitude, latitude })
+          });
+          
+          if (!locationResponse.ok) {
+            console.warn('Failed to update driver location after delivery', await locationResponse.text());
+          } else {
+            console.log('Driver location successfully updated with GPS coordinates after delivery');
+          }
+        } else {
+          console.warn('Could not obtain current GPS location');
+        }
+      } catch (locationError) {
+        console.error('Error updating location after delivery:', locationError);
+        // Continue despite location update failure
       }
 
     } catch (e) {
@@ -691,7 +732,7 @@ export default function OrdersScreen() {
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="card-outline" size={16} color="#555" style={styles.icon} />
-            <Text style={styles.infoText}>Earned: ${delivery.earnMoney.toFixed(2)}</Text>
+            <Text style={styles.infoText}>Earned: Rs. {delivery.earnMoney.toFixed(2)}</Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="receipt-outline" size={16} color="#555" style={styles.icon} />
@@ -703,9 +744,9 @@ export default function OrdersScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Orders</Text>
+    <ScreenLayout barStyle="light-content">
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Orders</Text>
       </View>
 
       <View style={styles.tabContainer}>
@@ -723,105 +764,149 @@ export default function OrdersScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading && (
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor={'#007AFF'}
+          />
+        }
+      >
+        {loading && !refreshing && (
           <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color="#007AFF" />
           </View>
-      )}
-      {error && <Text style={styles.errorText}>Error: {error}</Text>}
+        )}
+        
+        {error && <Text style={styles.errorText}>Error: {error}</Text>}
 
-      {!loading && !error && (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContentContainer}>
-          {activeTab === 'Current' ? (
-            // Display current orders
-            filteredOrders.length > 0 ? (
-              filteredOrders.map((order) => (
-                <TouchableOpacity key={order._id} style={styles.orderCard} onPress={() => handleToggleDetails(order._id)} activeOpacity={0.8}>
-                  <View style={styles.orderContent}>
-                    <View style={styles.orderHeader}>
-                      <Text style={styles.orderId}>Order #{order._id.substring(0, 6)}...</Text>
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-                        <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
-                      </View>
+        {!loading && !error && activeTab === 'Current' && (
+          filteredOrders.length > 0 ? (
+            filteredOrders.map((order) => (
+              <TouchableOpacity key={order._id} style={styles.orderCard} onPress={() => handleToggleDetails(order._id)} activeOpacity={0.8}>
+                <View style={styles.orderContent}>
+                  <View style={styles.orderHeader}>
+                    <Text style={styles.orderId}>Order #{order._id.substring(0, 6)}...</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+                      <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
                     </View>
-
-                    <View style={styles.infoRow}>
-                       <Ionicons name="restaurant-outline" size={16} color="#555" style={styles.icon} />
-                       <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.restaurantName}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                       <Ionicons name="location-outline" size={16} color="#555" style={styles.icon} />
-                       <Text style={styles.infoText} numberOfLines={1}>{order.deliveryAddress}</Text>
-                    </View>
-
-                    <View style={styles.orderFooter}>
-                       <Text style={styles.totalText}>${order.total.toFixed(2)}</Text>
-                       <View style={styles.actionButtonContainer}>
-                          {getActionButton(order)}
-                       </View>
-                    </View>
-
-                    {expandedOrderId === order._id && (
-                      <View style={styles.expandedDetails}>
-                        <Text style={styles.detailTitle}>Details</Text>
-                        <Text style={styles.detailText}>Restaurant: {order.restaurant.restaurantName} ({order.restaurant.address})</Text>
-                        <Text style={styles.detailText}>Customer: {order.user.name}</Text>
-                        <Text style={styles.detailText}>Deliver To: {order.deliveryAddress}</Text>
-                        {order.deliveryInstructions && <Text style={styles.detailText}>Instructions: {order.deliveryInstructions}</Text>}
-                        <Text style={styles.detailText}>Payment: {order.paymentMethod} ({order.paymentStatus})</Text>
-                        <Text style={styles.detailText}>Created: {new Date(order.createdAt).toLocaleString()}</Text>
-
-                        <Text style={styles.detailTitle}>Items:</Text>
-                        {order.foods.map(item => (
-                           <Text key={item.id} style={styles.detailText}> - {item.name} (x{item.quantity}) @ ${item.price.toFixed(2)}</Text>
-                        ))}
-                        <Text style={styles.detailText}>Subtotal: ${order.subtotal.toFixed(2)}</Text>
-                        <Text style={styles.detailText}>Delivery Fee: ${order.deliveryFee.toFixed(2)}</Text>
-                        <Text style={styles.detailText}>Tax: ${order.tax.toFixed(2)}</Text>
-                        <Text style={[styles.detailText, styles.boldText]}>Total: ${order.total.toFixed(2)}</Text>
-                      </View>
-                    )}
                   </View>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noOrdersText}>No current orders found.</Text>
-            )
+
+                  <View style={styles.infoRow}>
+                    <Ionicons name="restaurant-outline" size={16} color="#555" style={styles.icon} />
+                    <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.restaurantName}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Ionicons name="location-outline" size={16} color="#555" style={styles.icon} />
+                    <Text style={styles.infoText} numberOfLines={1}>{order.deliveryAddress}</Text>
+                  </View>
+
+                  <View style={styles.orderFooter}>
+                    <Text style={styles.totalText}>Rs. {order.total.toFixed(2)}</Text>
+                    <View style={styles.actionButtonContainer}>
+                      {getActionButton(order)}
+                    </View>
+                  </View>
+
+                  {expandedOrderId === order._id && (
+                    <View style={styles.expandedDetails}>
+                      <Text style={styles.detailTitle}>Details</Text>
+                      <Text style={styles.detailText}>Restaurant: {order.restaurant.restaurantName} ({order.restaurant.address})</Text>
+                      <Text style={styles.detailText}>Customer: {order.user.name}</Text>
+                      <Text style={styles.detailText}>Deliver To: {order.deliveryAddress}</Text>
+                      {order.deliveryInstructions && <Text style={styles.detailText}>Instructions: {order.deliveryInstructions}</Text>}
+                      <Text style={styles.detailText}>Payment: {order.paymentMethod} ({order.paymentStatus})</Text>
+                      <Text style={styles.detailText}>Created: {new Date(order.createdAt).toLocaleString()}</Text>
+
+                      <Text style={styles.detailTitle}>Items:</Text>
+                      {order.foods.map(item => (
+                        <Text key={item.id} style={styles.detailText}> - {item.name} (x{item.quantity}) @ Rs. {item.price.toFixed(2)}</Text>
+                      ))}
+                      <Text style={styles.detailText}>Subtotal: Rs. {order.subtotal.toFixed(2)}</Text>
+                      <Text style={styles.detailText}>Delivery Fee: Rs. {order.deliveryFee.toFixed(2)}</Text>
+                      <Text style={styles.detailText}>Tax: Rs. {order.tax.toFixed(2)}</Text>
+                      <Text style={[styles.detailText, styles.boldText]}>Total: Rs. {order.total.toFixed(2)}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))
           ) : (
-            // Display past deliveries in Past tab
-            deliveryHistory.length > 0 ? (
-              deliveryHistory.map((delivery) => renderDeliveryHistoryItem(delivery))
-            ) : (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="receipt-outline" size={50} color="#ccc" />
+              <Text style={styles.noOrdersText}>No current orders found.</Text>
+              <Text style={styles.pullToRefreshText}>Pull down to refresh</Text>
+            </View>
+          )
+        )}
+
+        {!loading && !error && activeTab === 'Past' && (
+          deliveryHistory.length > 0 ? (
+            deliveryHistory.map((delivery) => renderDeliveryHistoryItem(delivery))
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="time-outline" size={50} color="#ccc" />
               <Text style={styles.noOrdersText}>No past deliveries found.</Text>
-            )
-          )}
-        </ScrollView>
-      )}
-    </SafeAreaView>
+              <Text style={styles.pullToRefreshText}>Pull down to refresh</Text>
+            </View>
+          )
+        )}
+      </ScrollView>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0', 
+    backgroundColor: '#f0f0f0',
+    // No paddingTop - let the header handle this consistently
   },
-  header: {
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    alignItems: 'center',
+  headerContainer: {
+    backgroundColor: '#f29f05',
+    padding: 20,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 40,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    // Remove the alignItems: 'center', to align text to the left like other pages
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
+    margin: 16,
+    marginTop: -20,
+    borderRadius: 15,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   tab: {
     flex: 1, 
@@ -845,6 +930,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
+    flexGrow: 1,
     paddingBottom: 20,
   },
   loadingContainer: {
@@ -972,5 +1058,19 @@ const styles = StyleSheet.create({
   },
   boldText: {
       fontWeight: 'bold',
-  }
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  pullToRefreshText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+  },
 });

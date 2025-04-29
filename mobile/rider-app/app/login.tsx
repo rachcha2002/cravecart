@@ -1,5 +1,5 @@
 // app/login.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../src/context/AuthContext";
+import * as Location from 'expo-location'; // Add location import
+import { API_URLS } from "../src/api/authApi"; // Import API_URLS
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -18,6 +21,57 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [locationPermission, setLocationPermission] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  // Request location permissions when component mounts
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status === 'granted');
+      if (status !== 'granted') {
+        Alert.alert(
+          "Location Permission Required",
+          "This app needs location access to update your position for deliveries. Please enable location services in your settings.",
+          [{ text: "OK" }]
+        );
+      }
+    })();
+  }, []);
+
+  // Function to update driver's location
+  const updateDriverLocation = async (userId: string) => {
+    try {
+      setLocationLoading(true);
+      
+      // Get current position
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High
+      });
+      
+      const { longitude, latitude } = currentLocation.coords;
+      console.log('Current GPS coordinates on login:', { longitude, latitude });
+      
+      // Send location update to server
+      const locationResponse = await fetch(`${API_URLS.AUTH_SERVICE}/deliveries/updatelocation/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ longitude, latitude })
+      });
+      
+      if (!locationResponse.ok) {
+        console.warn('Failed to update driver location on login', await locationResponse.text());
+      } else {
+        console.log('Driver location successfully updated on login');
+      }
+    } catch (error) {
+      console.error('Error updating location on login:', error);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -38,6 +92,11 @@ export default function LoginScreen() {
       if (!response.user.isVerified) {
         router.replace("/verification-pending");
         return;
+      }
+
+      // Update driver's location if permission is granted
+      if (locationPermission && response.user._id) {
+        await updateDriverLocation(response.user._id);
       }
 
       // Navigate to the main app
@@ -72,12 +131,24 @@ export default function LoginScreen() {
           secureTextEntry
         />
 
+        {!locationPermission && (
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={async () => {
+              const { status } = await Location.requestForegroundPermissionsAsync();
+              setLocationPermission(status === 'granted');
+            }}
+          >
+            <Text style={styles.permissionButtonText}>Enable Location Services</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[styles.button, (loading || locationLoading) && styles.buttonDisabled]}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || locationLoading}
         >
-          {loading ? (
+          {loading || locationLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text style={styles.buttonText}>Sign In</Text>
@@ -169,5 +240,17 @@ const styles = StyleSheet.create({
     color: "#f29f05",
     fontSize: 14,
     fontWeight: "bold",
+  },
+  permissionButton: {
+    backgroundColor: '#e0e0e0',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  permissionButtonText: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

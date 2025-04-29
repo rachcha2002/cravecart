@@ -1,10 +1,27 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Platform,
+  StatusBar
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { setupDarkStatusBar } from '../../src/utils/statusBarConfig';
+import ScreenLayout from '../../src/components/ScreenLayout';
+
+// Define a type for the period string literal to fix the indexing issue
+type PeriodType = 'today' | 'weekly' | 'monthly';
 
 export default function Earnings() {
-  const [selectedPeriod, setSelectedPeriod] = useState('today');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('today');
+
+  useEffect(() => {
+    setupDarkStatusBar();
+  }, []);
 
   const earningsData = {
     today: {
@@ -27,10 +44,11 @@ export default function Earnings() {
     }
   };
 
+  // Now TypeScript knows that selectedPeriod can only be 'today', 'weekly', or 'monthly'
   const currentData = earningsData[selectedPeriod];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenLayout barStyle="light-content">
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
@@ -102,7 +120,7 @@ export default function Earnings() {
           <Text style={styles.withdrawButtonText}>Withdraw Earnings</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 }
 
@@ -117,7 +135,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#f29f05',
     padding: 20,
-    paddingTop: 40,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 40,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     ...Platform.select({
@@ -291,4 +309,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-}); 
+});

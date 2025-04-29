@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -47,59 +48,64 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome Back</Text>
-      <Text style={styles.subtitle}>Sign in to continue</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Sign in to continue</Text>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={formData.email}
-          onChangeText={(text) => setFormData({ ...formData, email: text })}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={formData.password}
-          onChangeText={(text) => setFormData({ ...formData, password: text })}
-          secureTextEntry
-        />
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={formData.email}
+            onChangeText={(text) => setFormData({ ...formData, email: text })}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={formData.password}
+            onChangeText={(text) => setFormData({ ...formData, password: text })}
+            secureTextEntry
+          />
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? "Signing in..." : "Sign In"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.forgotPassword}
-          onPress={() => navigation.navigate("ForgotPassword")}
-        >
-          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-        </TouchableOpacity>
-
-        <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-            <Text style={styles.registerLink}>Register</Text>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? "Signing in..." : "Sign In"}
+            </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.forgotPassword}
+            onPress={() => navigation.navigate("ForgotPassword")}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          <View style={styles.registerContainer}>
+            <Text style={styles.registerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+              <Text style={styles.registerLink}>Register</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  container: {
+    flex: 1,
     padding: 20,
     justifyContent: "center",
   },
