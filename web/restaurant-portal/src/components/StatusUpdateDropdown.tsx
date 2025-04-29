@@ -16,9 +16,6 @@ const StatusUpdateDropdown: React.FC<StatusUpdateDropdownProps> = ({ currentStat
     { value: 'order-received', label: 'Order Received' },
     { value: 'preparing-your-order', label: 'Preparing Order' },
     { value: 'wrapping-up', label: 'Wrapping Up' },
-    { value: 'picking-up', label: 'Picking Up' },
-    { value: 'heading-your-way', label: 'Heading Your Way' },
-    { value: 'delivered', label: 'Delivered' },
     { value: 'cancelled', label: 'Cancelled' }
   ];
 
@@ -60,8 +57,8 @@ const StatusUpdateDropdown: React.FC<StatusUpdateDropdownProps> = ({ currentStat
     setIsOpen(false);
   };
 
-  // Determine if status is completed or cancelled and disable dropdown
-  const isDisabled = currentStatus === 'delivered' || currentStatus === 'cancelled';
+  // Determine if status is cancelled (can't be changed once cancelled)
+  const isDisabled = currentStatus === 'cancelled';
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -71,12 +68,6 @@ const StatusUpdateDropdown: React.FC<StatusUpdateDropdownProps> = ({ currentStat
         return "bg-[#f29f05]/10 text-[#f29f05]";
       case "wrapping-up":
         return "bg-blue-100 text-blue-800";
-      case "picking-up":
-        return "bg-purple-100 text-purple-800";
-      case "heading-your-way":
-        return "bg-indigo-100 text-indigo-800";
-      case "delivered":
-        return "bg-green-100 text-green-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:

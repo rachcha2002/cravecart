@@ -35,12 +35,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
         return "bg-[#f29f05]/10 text-[#f29f05] border-[#f29f05]/20";
       case "wrapping-up":
         return "bg-blue-100 text-blue-800 border-blue-200";
-      case "picking-up":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "heading-your-way":
-        return "bg-indigo-100 text-indigo-800 border-indigo-200";
-      case "delivered":
-        return "bg-green-100 text-green-800 border-green-200";
       case "cancelled":
         return "bg-red-100 text-red-800 border-red-200";
       default:
