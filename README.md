@@ -2,7 +2,7 @@
 
 CraveCart is a comprehensive food delivery platform built using a microservices architecture. This system connects customers, restaurants, and delivery personnel through a modern, scalable application stack.
 
-![CraveCart Logo](https://example.com/cravecart-logo.png)
+![CraveCart Logo](https://res.cloudinary.com/dn1w8k2l1/image/upload/v1745527245/logo_jxgxfg.png)
 
 ## System Overview
 
