@@ -11,13 +11,14 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
 import * as ImagePicker from "expo-image-picker";
 import { uploadToCloudinary } from "../../src/services/uploadService";
 import { useRouter } from "expo-router";
+import ScreenLayout from "../../src/components/ScreenLayout";
 
 export default function Profile() {
   const { user, loading, updateProfile, updateProfileImage, logout } =
@@ -148,7 +149,7 @@ export default function Profile() {
     : require("../../assets/default-profile.png"); // Make sure to add a default image
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenLayout barStyle="light-content">
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
@@ -348,7 +349,7 @@ export default function Profile() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 }
 
@@ -363,7 +364,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#f29f05",
     padding: 20,
-    paddingTop: 40,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 40,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

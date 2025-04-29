@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
+  StatusBar
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { useAuth } from '../../src/context/AuthContext';
 import * as Location from 'expo-location';
 import io from 'socket.io-client';
 import { API_URLS } from '../../src/api/authApi';
+import { setupDarkStatusBar } from "../../src/utils/statusBarConfig";
+import ScreenLayout from '../../src/components/ScreenLayout';
 
 interface Restaurant {
   _id: string;
@@ -102,7 +105,6 @@ interface DeliveryHistory {
   earnMoney: number
 }
 
-// Add an interface for the location received response
 interface LocationReceivedResponse {
   success: boolean;
   timestamp: string;
@@ -152,6 +154,14 @@ export default function OrdersScreen() {
         console.log('Socket disconnected');
       }
     };
+  }, []);
+
+  // Set up status bar appearance - use the setupDarkStatusBar 
+  // function for consistency instead of direct StatusBar calls
+  useEffect(() => {
+    // Use consistent status bar config across all screens
+    setupDarkStatusBar();
+    // No cleanup to maintain consistent behavior
   }, []);
 
   // Function to fetch nearby orders
@@ -722,7 +732,7 @@ export default function OrdersScreen() {
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="card-outline" size={16} color="#555" style={styles.icon} />
-            <Text style={styles.infoText}>Earned: ${delivery.earnMoney.toFixed(2)}</Text>
+            <Text style={styles.infoText}>Earned: Rs. {delivery.earnMoney.toFixed(2)}</Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="receipt-outline" size={16} color="#555" style={styles.icon} />
@@ -734,9 +744,9 @@ export default function OrdersScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Orders</Text>
+    <ScreenLayout barStyle="light-content">
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Orders</Text>
       </View>
 
       <View style={styles.tabContainer}>
@@ -796,7 +806,7 @@ export default function OrdersScreen() {
                   </View>
 
                   <View style={styles.orderFooter}>
-                    <Text style={styles.totalText}>${order.total.toFixed(2)}</Text>
+                    <Text style={styles.totalText}>Rs. {order.total.toFixed(2)}</Text>
                     <View style={styles.actionButtonContainer}>
                       {getActionButton(order)}
                     </View>
@@ -814,12 +824,12 @@ export default function OrdersScreen() {
 
                       <Text style={styles.detailTitle}>Items:</Text>
                       {order.foods.map(item => (
-                        <Text key={item.id} style={styles.detailText}> - {item.name} (x{item.quantity}) @ ${item.price.toFixed(2)}</Text>
+                        <Text key={item.id} style={styles.detailText}> - {item.name} (x{item.quantity}) @ Rs. {item.price.toFixed(2)}</Text>
                       ))}
-                      <Text style={styles.detailText}>Subtotal: ${order.subtotal.toFixed(2)}</Text>
-                      <Text style={styles.detailText}>Delivery Fee: ${order.deliveryFee.toFixed(2)}</Text>
-                      <Text style={styles.detailText}>Tax: ${order.tax.toFixed(2)}</Text>
-                      <Text style={[styles.detailText, styles.boldText]}>Total: ${order.total.toFixed(2)}</Text>
+                      <Text style={styles.detailText}>Subtotal: Rs. {order.subtotal.toFixed(2)}</Text>
+                      <Text style={styles.detailText}>Delivery Fee: Rs. {order.deliveryFee.toFixed(2)}</Text>
+                      <Text style={styles.detailText}>Tax: Rs. {order.tax.toFixed(2)}</Text>
+                      <Text style={[styles.detailText, styles.boldText]}>Total: Rs. {order.total.toFixed(2)}</Text>
                     </View>
                   )}
                 </View>
@@ -846,31 +856,57 @@ export default function OrdersScreen() {
           )
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0', 
+    backgroundColor: '#f0f0f0',
+    // No paddingTop - let the header handle this consistently
   },
-  header: {
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    alignItems: 'center',
+  headerContainer: {
+    backgroundColor: '#f29f05',
+    padding: 20,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 40,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    // Remove the alignItems: 'center', to align text to the left like other pages
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
+    margin: 16,
+    marginTop: -20,
+    borderRadius: 15,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   tab: {
     flex: 1, 

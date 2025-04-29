@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,17 @@ import {
   StyleSheet,
   Platform,
   Image,
+  StatusBar,
+  BackHandler,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { NotificationBellIcon } from "../../src/components/NotificationBellIcon";
 import { useNotifications } from "../../src/context/NotificationsContext";
+import { setupDarkStatusBar } from "../../src/utils/statusBarConfig";
+import React from "react";
+import ScreenLayout from "../../src/components/ScreenLayout";
 
 export default function Dashboard() {
   const [isOnline, setIsOnline] = useState(true);
@@ -54,8 +58,29 @@ export default function Dashboard() {
     }
   };
 
+  // Configure status bar for this screen
+  useEffect(() => {
+    setupDarkStatusBar();
+  }, []);
+
+  // Prevent back button on home screen
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        return true; // Prevent default behavior (going back)
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress', 
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [])
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenLayout barStyle="light-content">
       {notification && (
         <View style={styles.notificationBadge}>
           <Text style={styles.notificationText}>New notification!</Text>
@@ -133,7 +158,7 @@ export default function Dashboard() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 }
 
@@ -148,7 +173,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#f29f05",
     padding: 20,
-    paddingTop: 40,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 40,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
