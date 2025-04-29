@@ -11,7 +11,6 @@ import {
   RefreshControl,
   StatusBar
 } from 'react-native';
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import * as Location from 'expo-location';
@@ -23,11 +22,26 @@ import ScreenLayout from '../../src/components/ScreenLayout';
 interface Restaurant {
   _id: string;
   name: string;
-  restaurantName: string;
   address: string;
-  location: {
-    type: string;
-    coordinates: number[];
+  restaurantInfo: {
+    restaurantName: string;
+    description?: string;
+    location: {
+      type: string;
+      coordinates: number[];
+    };
+    cuisine: string[];
+    images: Array<{
+      url: string;
+      description: string;
+      isPrimary: boolean;
+      uploadedAt: string;
+      _id: string;
+    }>;
+    businessHours?: {
+      open: string;
+      close: string;
+    };
   };
 }
 
@@ -351,7 +365,7 @@ export default function OrdersScreen() {
             body: JSON.stringify({
               userIds: [order.user._id],
               title: 'Order Update',
-              message: `Your order from ${order.restaurant.restaurantName} is now being picked up by your driver.`,
+              message: `Your order from ${order.restaurant.restaurantInfo.restaurantName} is now being picked up by your driver.`,
               channels: ['sms', 'in-app'] // As requested, SMS and in-app
             })
           });
@@ -425,7 +439,7 @@ export default function OrdersScreen() {
             body: JSON.stringify({
               userIds: [order.user._id],
               title: 'Order Update',
-              message: `Your order from ${order.restaurant.restaurantName} is on the way! Your driver has picked up your food.`,
+              message: `Your order from ${order.restaurant.restaurantInfo.restaurantName} is on the way! Your driver has picked up your food.`,
               channels: ['sms', 'in-app']
             })
           });
@@ -485,7 +499,7 @@ export default function OrdersScreen() {
             body: JSON.stringify({
               userIds: [order.user._id],
               title: 'Order Delivered',
-              message: `Your order from ${order.restaurant.restaurantName} has been delivered! Enjoy your meal.`,
+              message: `Your order from ${order.restaurant.restaurantInfo.restaurantName} has been delivered! Enjoy your meal.`,
               channels: ['sms', 'in-app']
             })
           });
@@ -674,8 +688,8 @@ export default function OrdersScreen() {
         return (
           <>
             <TouchableOpacity style={styles.navigateButton} onPress={() => openMapLink(
-              order.restaurant.location.coordinates[1], 
-              order.restaurant.location.coordinates[0], 
+              order.restaurant.restaurantInfo.location.coordinates[1], 
+              order.restaurant.restaurantInfo.location.coordinates[0], 
               'restaurant')}>
               <Text style={styles.actionButtonText}>To Restaurant</Text>
             </TouchableOpacity>
@@ -790,7 +804,7 @@ export default function OrdersScreen() {
               <TouchableOpacity key={order._id} style={styles.orderCard} onPress={() => handleToggleDetails(order._id)} activeOpacity={0.8}>
                 <View style={styles.orderContent}>
                   <View style={styles.orderHeader}>
-                    <Text style={styles.orderId}>Order #{order._id.substring(0, 6)}...</Text>
+                    <Text style={styles.orderId}>{order.orderId}</Text>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
                       <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
                     </View>
@@ -798,7 +812,7 @@ export default function OrdersScreen() {
 
                   <View style={styles.infoRow}>
                     <Ionicons name="restaurant-outline" size={16} color="#555" style={styles.icon} />
-                    <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.restaurantName}</Text>
+                    <Text style={styles.infoText} numberOfLines={1}>{order.restaurant.restaurantInfo.restaurantName}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Ionicons name="location-outline" size={16} color="#555" style={styles.icon} />
@@ -815,7 +829,7 @@ export default function OrdersScreen() {
                   {expandedOrderId === order._id && (
                     <View style={styles.expandedDetails}>
                       <Text style={styles.detailTitle}>Details</Text>
-                      <Text style={styles.detailText}>Restaurant: {order.restaurant.restaurantName} ({order.restaurant.address})</Text>
+                      <Text style={styles.detailText}>Restaurant: {order.restaurant.restaurantInfo.restaurantName} ({order.restaurant.address})</Text>
                       <Text style={styles.detailText}>Customer: {order.user.name}</Text>
                       <Text style={styles.detailText}>Deliver To: {order.deliveryAddress}</Text>
                       {order.deliveryInstructions && <Text style={styles.detailText}>Instructions: {order.deliveryInstructions}</Text>}
@@ -989,8 +1003,10 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
   icon: {
     marginRight: 8,
@@ -1000,19 +1016,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
   },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
   totalText: {
      fontSize: 16,
      fontWeight: 'bold',
      color: '#333',
+  },
+  orderFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
   actionButtonContainer: {
      flexDirection: 'row',

@@ -15,24 +15,23 @@ const findNearbyWrappingOrders = async (req, res) => {
     const userLat = parseFloat(latitude);
     console.log('Coordinates:', [userLong, userLat]);
 
-    // Since we can't use MongoDB's built-in geospatial queries due to lacking index,
-    // we'll fetch orders and manually filter
     const wrappingOrders = await Order.find({
       status: 'wrapping-up'
     });
 
     const nearbyOrders = wrappingOrders.filter(order => {
-      if (!order.restaurant || !order.restaurant.location || 
-          !order.restaurant.location.coordinates || 
-          !Array.isArray(order.restaurant.location.coordinates) || 
-          order.restaurant.location.coordinates.length !== 2) {
+      if (!order.restaurant || 
+          !order.restaurant.restaurantInfo || 
+          !order.restaurant.restaurantInfo.location || 
+          !order.restaurant.restaurantInfo.location.coordinates || 
+          !Array.isArray(order.restaurant.restaurantInfo.location.coordinates) || 
+          order.restaurant.restaurantInfo.location.coordinates.length !== 2) {
         return false;
       }
 
-      const restaurantLong = order.restaurant.location.coordinates[0];
-      const restaurantLat = order.restaurant.location.coordinates[1];
+      const restaurantLong = order.restaurant.restaurantInfo.location.coordinates[0];
+      const restaurantLat = order.restaurant.restaurantInfo.location.coordinates[1];
       
-    
       const R = 6371; 
       const dLat = toRadians(restaurantLat - userLat);
       const dLon = toRadians(restaurantLong - userLong);
