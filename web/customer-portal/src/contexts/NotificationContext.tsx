@@ -60,7 +60,7 @@ export const useNotifications = () => {
 
 // Get socket.io server URL from environment variable or use a default
 const NOTIFICATION_SERVICE_URL =
-  process.env.REACT_APP_NOTIFICATION_SERVICE_URL || "http://localhost:5005";
+  process.env.REACT_APP_NOTIFICATION_SERVICE_URL ;
 
 // Provider component
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({
