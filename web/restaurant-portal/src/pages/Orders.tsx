@@ -184,12 +184,6 @@ const Orders: React.FC = () => {
         return "bg-[#f29f05]/10 text-[#f29f05]";
       case "wrapping-up":
         return "bg-blue-100 text-blue-800";
-      case "picking-up":
-        return "bg-purple-100 text-purple-800";
-      case "heading-your-way":
-        return "bg-indigo-100 text-indigo-800";
-      case "delivered":
-        return "bg-green-100 text-green-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:
@@ -302,28 +296,28 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 font-medium">Delivered</p>
-                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status === 'delivered').length}</p>
+                <p className="text-sm text-gray-500 font-medium">New Orders</p>
+                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status === 'order-received').length}</p>
               </div>
-              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <div className="h-12 w-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 font-medium">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status !== 'delivered' && order.status !== 'cancelled').length}</p>
+                <p className="text-sm text-gray-500 font-medium">Preparing</p>
+                <p className="text-2xl font-bold text-gray-900">{orders.filter(order => order.status === 'preparing-your-order' || order.status === 'wrapping-up').length}</p>
               </div>
-              <div className="h-12 w-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <svg className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -388,16 +382,6 @@ const Orders: React.FC = () => {
             }`}
           >
             Wrapping Up
-          </button>
-          <button 
-            onClick={() => setActiveFilter("delivered")}
-            className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-all ${
-              activeFilter === "delivered" 
-                ? "bg-green-500 text-white shadow-sm" 
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            Delivered
           </button>
           <button 
             onClick={() => setActiveFilter("cancelled")}
