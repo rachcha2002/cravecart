@@ -1,0 +1,51 @@
+{
+  "cli": {
+    "version": ">= 12.5.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BASE_URL": "http://192.168.121.59",
+        "EXPO_PUBLIC_AUTH_SERVICE": "http://34.132.7.64:3001/api",
+        "EXPO_PUBLIC_ORDER_SERVICE": "http://34.45.142.152:5003/api/deliveries",
+        "EXPO_PUBLIC_DELIVERY_SERVICE": "http://35.226.92.191:3005/api/deliveries",
+        "EXPO_PUBLIC_NOTIFICATION_SERVICE": "http://34.58.115.37:5005/api",
+        "EXPO_PUBLIC_SOCKET_SERVICE": "http://35.226.92.191:3005",
+        "EXPO_PUBLIC_CLOUDNAME": "dn1w8k2l1",
+        "EXPO_PUBLIC_UPLOAD_PRESET": "delivery_profiles"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BASE_URL": "http://192.168.121.59",
+        "EXPO_PUBLIC_AUTH_SERVICE": "http://34.132.7.64:3001/api",
+        "EXPO_PUBLIC_ORDER_SERVICE": "http://34.45.142.152:5003/api/deliveries",
+        "EXPO_PUBLIC_DELIVERY_SERVICE": "http://35.226.92.191:3005/api/deliveries",
+        "EXPO_PUBLIC_NOTIFICATION_SERVICE": "http://34.58.115.37:5005/api",
+        "EXPO_PUBLIC_SOCKET_SERVICE": "http://35.226.92.191:3005",
+        "EXPO_PUBLIC_CLOUDNAME": "dn1w8k2l1",
+        "EXPO_PUBLIC_UPLOAD_PRESET": "delivery_profiles"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_BASE_URL": "http://192.168.121.59",
+        "EXPO_PUBLIC_AUTH_SERVICE": "http://34.132.7.64:3001/api",
+        "EXPO_PUBLIC_ORDER_SERVICE": "http://34.45.142.152:5003/api/deliveries",
+        "EXPO_PUBLIC_DELIVERY_SERVICE": "http://35.226.92.191:3005/api/deliveries",
+        "EXPO_PUBLIC_NOTIFICATION_SERVICE": "http://34.58.115.37:5005/api",
+        "EXPO_PUBLIC_SOCKET_SERVICE": "http://35.226.92.191:3005",
+        "EXPO_PUBLIC_CLOUDNAME": "dn1w8k2l1",
+        "EXPO_PUBLIC_UPLOAD_PRESET": "delivery_profiles"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

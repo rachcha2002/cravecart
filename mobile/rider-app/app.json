@@ -8,12 +8,16 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#ffffff",
     "splash": {
+      "image": "./assets/splash/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cravecart.riderapp"
@@ -27,7 +31,11 @@
         "ACCESS_BACKGROUND_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,16 +43,16 @@
     "plugins": [
       "expo-router",
       [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#f29f05",
-          "sounds": ["./assets/notification.wav"]
-        }
+        "expo-notifications"
       ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging"
     ],
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "00292099-5252-40ff-b6e9-f2d7921756bc"
+      }
+    }
   }
 }
