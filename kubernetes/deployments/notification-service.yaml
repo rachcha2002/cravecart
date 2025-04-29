@@ -16,29 +16,37 @@ spec:
       labels:
         app: notification-service
     spec:
+      volumes:
+      - name: src-volume
+        configMap:
+          name: notification-service-src
       containers:
       - name: notification-service
         image: gcr.io/cravecart-457103/notification-service:latest
         ports:
         - containerPort: 5005
+        volumeMounts:
+        - name: src-volume
+          mountPath: /usr/src/app/src/server.js
+          subPath: server.js
         resources:
           limits:
             cpu: "1.0"
-            memory: "1536Mi"
+            memory: "2048Mi"
           requests:
             cpu: "1.0"
-            memory: "1536Mi"
+            memory: "2048Mi"
         envFrom:
         - configMapRef:
             name: notification-service-config
         readinessProbe:
           httpGet:
-            path: /api/health
+            path: /health
             port: 5005
           initialDelaySeconds: 15
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /api/health
+            path: /health
             port: 5005
           initialDelaySeconds: 30

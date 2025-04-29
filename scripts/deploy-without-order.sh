@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Comprehensive CraveCart deployment script
+# Comprehensive CraveCart deployment script (without order-service)
 # This script handles the full deployment process:
 # 1. Builds all service Docker images
 # 2. Pushes images to Google Container Registry
@@ -11,7 +11,7 @@
 # Note: This script is configured for a fixed 8-node cluster
 # with higher resource allocations per service.
 #
-# Usage: bash full-deploy.sh [namespace]
+# Usage: bash deploy-without-order.sh [namespace]
 
 # Set your Google Cloud project ID
 PROJECT_ID="cravecart-457103"
@@ -31,7 +31,6 @@ echo -e "${YELLOW}[INFO]${NC} Will deploy to namespace: $NAMESPACE"
 # Array of service names to build and push
 SERVICES=(
   "user-service"
-  "order-service"
   "payment-service"
   "restaurant-service"
   "notification-service"
@@ -125,6 +124,13 @@ echo -e "${YELLOW}[INFO]${NC} Fixing Kubernetes YAML files..."
 for file in kubernetes/deployments/*.yaml; do
   if [ -f "$file" ]; then
     SERVICE_NAME=$(basename "$file" .yaml)
+    
+    # Skip order-service
+    if [ "$SERVICE_NAME" == "order-service" ]; then
+      echo -e "${YELLOW}[INFO]${NC} Skipping order-service deployment"
+      continue
+    fi
+    
     echo -e "${YELLOW}[INFO]${NC} Fixing deployment file for $SERVICE_NAME..."
     
     # Create a temporary file
@@ -176,6 +182,13 @@ done
 for file in kubernetes/services/*.yaml; do
   if [ -f "$file" ]; then
     SERVICE_NAME=$(basename "$file" .yaml)
+    
+    # Skip order-service
+    if [ "$SERVICE_NAME" == "order-service" ]; then
+      echo -e "${YELLOW}[INFO]${NC} Skipping order-service service"
+      continue
+    fi
+    
     echo -e "${YELLOW}[INFO]${NC} Fixing service file for $SERVICE_NAME..."
     
     # Create a temporary file
@@ -201,6 +214,13 @@ done
 for file in kubernetes/configmaps/*.yaml; do
   if [ -f "$file" ]; then
     CONFIG_NAME=$(basename "$file" .yaml)
+    
+    # Skip order-service related configs
+    if [[ "$CONFIG_NAME" == *"order-service"* ]]; then
+      echo -e "${YELLOW}[INFO]${NC} Skipping order-service configmap"
+      continue
+    fi
+    
     echo -e "${YELLOW}[INFO]${NC} Fixing configmap file for $CONFIG_NAME..."
     
     # Create a temporary file
@@ -218,6 +238,13 @@ done
 echo -e "${YELLOW}[INFO]${NC} Applying ConfigMaps..."
 for file in kubernetes/configmaps/*.yaml; do
   if [ -f "$file" ]; then
+    CONFIG_NAME=$(basename "$file" .yaml)
+    
+    # Skip order-service related configs
+    if [[ "$CONFIG_NAME" == *"order-service"* ]]; then
+      continue
+    fi
+    
     echo -e "${YELLOW}[INFO]${NC} Applying $file"
     kubectl apply -f "$file"
   fi
@@ -227,12 +254,15 @@ done
 echo -e "${YELLOW}[INFO]${NC} Applying Deployments..."
 for file in kubernetes/deployments/*.yaml; do
   if [ -f "$file" ]; then
+    SERVICE_NAME=$(basename "$file" .yaml)
+    
+    # Skip order-service
+    if [ "$SERVICE_NAME" == "order-service" ]; then
+      continue
+    fi
+    
     echo -e "${YELLOW}[INFO]${NC} Applying $file"
     kubectl apply -f "$file"
-    
-    # Extract service name from filename for status checking later
-    SERVICE_NAME=$(basename "$file" .yaml)
-    SERVICES+=("$SERVICE_NAME")
   fi
 done
 
@@ -240,6 +270,13 @@ done
 echo -e "${YELLOW}[INFO]${NC} Applying Services..."
 for file in kubernetes/services/*.yaml; do
   if [ -f "$file" ]; then
+    SERVICE_NAME=$(basename "$file" .yaml)
+    
+    # Skip order-service
+    if [ "$SERVICE_NAME" == "order-service" ]; then
+      continue
+    fi
+    
     echo -e "${YELLOW}[INFO]${NC} Applying $file"
     kubectl apply -f "$file"
   fi

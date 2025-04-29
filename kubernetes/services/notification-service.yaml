@@ -6,8 +6,10 @@ metadata:
   labels:
     app: notification-service
   annotations:
-    cloud.google.com/load-balancer-ip: "34.120.18.225"
+    cloud.google.com/load-balancer-ip: "34.58.115.37"
 spec:
+  type: LoadBalancer
+  loadBalancerIP: "34.58.115.37"
   selector:
     app: notification-service
   ports:

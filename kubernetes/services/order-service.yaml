@@ -2,12 +2,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: order-service
- 
+  
   labels:
     app: order-service
   annotations:
-    cloud.google.com/load-balancer-ip: "34.49.43.70"
+    cloud.google.com/load-balancer-ip: "34.45.142.152"
 spec:
+  type: LoadBalancer
+  loadBalancerIP: "34.45.142.152"
   selector:
     app: order-service
   ports:

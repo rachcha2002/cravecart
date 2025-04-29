@@ -148,6 +148,11 @@ notificationController.setSocketIO(io);
 // Routes
 app.use("/api/notifications", notificationRoutes);
 
+// Simple health check route
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'notification-service' });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

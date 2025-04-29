@@ -7,7 +7,7 @@
 PROJECT_ID="cravecart-457103"
 CLUSTER_NAME="cravecart-cluster"
 CLUSTER_ZONE="us-central1-a"  # Regional cluster in us-central1
-MACHINE_TYPE="e2-standard-2"  # 2 vCPUs, 8GB memory (reduced from 4 vCPUs)
+MACHINE_TYPE="e2-standard-2"  # 2 vCPUs, 8GB memory (sufficient for our service requirements)
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -15,8 +15,9 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Get node count from args or use default - reduced to fit quota
-NODE_COUNT=${1:-5}
+# Get node count from args or use default
+# Using fixed node count instead of autoscaling
+NODE_COUNT=${1:-8}
 echo -e "${YELLOW}[INFO]${NC} Will create cluster with $NODE_COUNT nodes"
 
 # Step 1: Check if required tools are installed
@@ -71,9 +72,6 @@ gcloud container clusters create $CLUSTER_NAME \
   --scopes "https://www.googleapis.com/auth/cloud-platform" \
   --network "default" \
   --enable-ip-alias \
-  --enable-autoscaling \
-  --min-nodes 3 \
-  --max-nodes 6 \
   --enable-autorepair \
   --enable-autoupgrade \
   --enable-vertical-pod-autoscaling \
@@ -109,10 +107,15 @@ echo -e "${YELLOW}[INFO]${NC} Node information:"
 kubectl get nodes
 
 echo -e "\n${GREEN}[INFO]${NC} Your Kubernetes cluster is now ready."
-echo -e "${YELLOW}[INFO]${NC} To deploy CraveCart services, run: bash scripts/full-deploy.sh"
+echo -e "${YELLOW}[INFO]${NC} To deploy CraveCart services, run: bash scripts/deploy-without-order.sh"
 echo -e "${YELLOW}[INFO]${NC} To view the Kubernetes dashboard, run: kubectl proxy"
 echo -e "${YELLOW}[INFO]${NC} Then visit: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/"
 
-echo -e "\n${YELLOW}[NOTE]${NC} Resource configuration has been reduced to fit within quota limits."
+echo -e "\n${YELLOW}[NOTE]${NC} Resource configuration has been set with a fixed node count of $NODE_COUNT nodes."
+echo -e "${YELLOW}[NOTE]${NC} Each service has been allocated 1 CPU and 2GB memory for requests."
+echo -e "${YELLOW}[NOTE]${NC} Each service is limited to 2 CPUs and 4GB memory."
+echo -e "${YELLOW}[NOTE]${NC} With 5 services (excluding order-service), total resource requirements are ~5 CPUs and ~10GB memory."
+echo -e "${YELLOW}[NOTE]${NC} The 8-node cluster with e2-standard-2 machines provides 16 vCPUs and 64GB memory in total."
+echo -e "${YELLOW}[NOTE]${NC} Autoscaling has been disabled - cluster will maintain a fixed count of $NODE_COUNT nodes."
 echo -e "${YELLOW}[NOTE]${NC} If you need more resources, request quota increases at:"
 echo -e "${YELLOW}[NOTE]${NC} https://console.cloud.google.com/iam-admin/quotas?project=$PROJECT_ID" 

@@ -2,12 +2,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: user-service
-
+ 
   labels:
     app: user-service
   annotations:
-    cloud.google.com/load-balancer-ip: "34.8.57.185"
+    cloud.google.com/load-balancer-ip: "34.132.7.64"
 spec:
+  type: LoadBalancer
+  loadBalancerIP: "34.132.7.64"
   selector:
     app: user-service
   ports:
