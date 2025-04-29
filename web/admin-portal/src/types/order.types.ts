@@ -32,12 +32,22 @@ export interface User {
   // Additional user fields
 }
 
+export interface RestaurantInfo {
+  restaurantName: string;
+  description: string;
+  cuisine: string[];
+  bestsellingItems: object;
+  location: object;
+  images: string[];
+}
+
 export interface Restaurant {
   _id: string;
   name: string;
   email?: string;
   phoneNumber?: string;
   address?: string;
+  restaurantInfo: RestaurantInfo;
   // Additional restaurant fields
 }
 

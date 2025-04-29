@@ -321,7 +321,7 @@ const Orders: React.FC = () => {
                       <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
                         <span className="text-blue-600 font-medium">{order.restaurant.name.charAt(0)}</span>
                       </div>
-                      <span>{order.restaurant.name}</span>
+                      <span>{order.restaurant?.restaurantInfo?.restaurantName || 'Perera Indian Restaurant'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
