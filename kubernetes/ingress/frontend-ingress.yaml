@@ -1,0 +1,65 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: admin-portal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "admin-portal-ip"
+    networking.gke.io/managed-certificates: "admin-portal-cert"
+    networking.gke.io/v1beta1.FrontendConfig: "cravecart-frontend-config"
+spec:
+  rules:
+  - host: admin.cravecart.live
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-portal-service
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: customer-portal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "customer-portal-ip"
+    networking.gke.io/managed-certificates: "customer-portal-cert"
+    networking.gke.io/v1beta1.FrontendConfig: "cravecart-frontend-config"
+spec:
+  rules:
+  - host: customer.cravecart.live
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: customer-portal-service
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: restaurant-portal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "restaurant-portal-ip"
+    networking.gke.io/managed-certificates: "restaurant-portal-cert"
+    networking.gke.io/v1beta1.FrontendConfig: "cravecart-frontend-config"
+spec:
+  rules:
+  - host: restaurant.cravecart.live
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: restaurant-portal-service
+            port:
+              number: 80 

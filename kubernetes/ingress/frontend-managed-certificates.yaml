@@ -1,0 +1,23 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: admin-portal-cert
+spec:
+  domains:
+    - admin.cravecart.live
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: customer-portal-cert
+spec:
+  domains:
+    - customer.cravecart.live
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: restaurant-portal-cert
+spec:
+  domains:
+    - restaurant.cravecart.live 

@@ -20,14 +20,14 @@ app.use(cors());
 app.use(helmet());
 app.use(express.json());
 
-// Simple health check route
+// Simple health check route - doesn't depend on database connectivity
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", service: serviceName });
+  res.status(200).json({ status: "ok", service: serviceName, timestamp: new Date().toISOString() });
 });
 
 // Add health check at /api/health path for Kubernetes probes
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok", service: serviceName });
+  res.status(200).json({ status: "ok", service: serviceName, timestamp: new Date().toISOString() });
 });
 
 // API Routes

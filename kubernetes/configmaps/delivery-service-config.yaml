@@ -20,8 +20,9 @@ data:
   USER_SERVICE_URL: "http://34.132.7.64:3001"
   
   # Web URLs
-  CUSTOMER_WEB_URL: "https://customer.cravecart.com"
-  ADMIN_WEB_URL: "https://admin.cravecart.com"
-  RESTAURANT_WEB_URL: "https://restaurant.cravecart.com"
+  CUSTOMER_WEB_URL: "http://35.226.62.115"
+  ADMIN_WEB_URL: "http://130.211.196.201"
+  RESTAURANT_WEB_URL: "http://34.134.98.231"
   
   # Mobile URLs
+  DELIVERY_MOBILE_URL: "http://localhost:3006"
