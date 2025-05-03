@@ -15,7 +15,7 @@ declare global {
 }
 
 // Use the provided Google Maps API key
-const GOOGLE_MAPS_API_KEY = "AIzaSyCgPYZ5K8EXB0Ip5jGMASp-mAXOVzw7BTk";
+const GOOGLE_MAPS_API_KEY = "AIzaSyD68sC1wsQ8N8sAsPC_kl1yxPCqYqAS4ec";
 
 const MapPreview: React.FC<MapPreviewProps> = ({
   address,
@@ -94,7 +94,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
 
     // Load Google Maps script if not already loading
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places&callback=${callbackName}`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=${callbackName}`;
     script.async = true;
     script.defer = true;
 

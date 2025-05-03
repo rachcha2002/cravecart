@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: customer-portal
-  namespace: cravecart
+  namespace: cravecartweb
   labels:
     app: customer-portal
 spec:
@@ -17,43 +17,38 @@ spec:
     spec:
       containers:
       - name: customer-portal
-        image: gcr.io/cravecart-web-458310/customer-portal:latest
+        image: gcr.io/cravecart-web-458310/customer-portal:v-20250502002903
         ports:
         - containerPort: 80
         resources:
-          limits:
-            cpu: "1.0"
-            memory: "2048Mi"
           requests:
-            cpu: "1.0"
-            memory: "2048Mi"
-        envFrom:
-        - configMapRef:
-            name: customer-portal-config
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 5
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
         livenessProbe:
           httpGet:
             path: /
             port: 80
           initialDelaySeconds: 30
           periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: customer-portal
-  namespace: cravecart
+  namespace: cravecartweb
 spec:
-  type: LoadBalancer
+  selector:
+    app: customer-portal
   ports:
   - port: 80
     targetPort: 80
-    protocol: TCP
-    name: http
-  selector:
-    app: customer-portal 
+  type: LoadBalancer

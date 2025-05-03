@@ -273,7 +273,7 @@ const OrderSummary: React.FC = () => {
       setShowMap(true);
       setSelectedSavedLocation(null);
     } else {
-      setShowMap(false);
+      setShowMap(false); // Explicitly ensure map is hidden for saved locations
       // If there's a default location and no saved location selected yet, select it
       if (defaultLocation && !selectedSavedLocation) {
         handleSelectSavedLocation(defaultLocation.id);
@@ -633,14 +633,7 @@ const OrderSummary: React.FC = () => {
                         </div>
                       )}
                 </div>
-                    {showMap && locationCoordinates && (
-                      <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden h-60">
-                    <MapPreview 
-                      address={deliveryAddress}
-                          onLocationSelect={(lat, lng, address) => handleLocationSelect(lat, lng, address)}
-                    />
-                      </div>
-                    )}
+                    {/* Map display is consolidated in the tabbed view only */}
                   </div>
                 )}
               </div>
@@ -668,14 +661,7 @@ const OrderSummary: React.FC = () => {
                     <span>Location validated ({deliveryDistanceKM.toFixed(1)} km away)</span>
                   </div>
                 )}
-                {showMap && locationCoordinates && (
-                  <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden h-60">
-                    <MapPreview
-                      address={deliveryAddress}
-                      onLocationSelect={(lat, lng, address) => handleLocationSelect(lat, lng, address)}
-                    />
-                  </div>
-                )}
+                {/* Map display is consolidated in the tabbed view only */}
                 {!user && (
                   <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm">
                     <p className="text-blue-800 dark:text-blue-300">
